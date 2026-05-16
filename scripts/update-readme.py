@@ -6,6 +6,7 @@ from pathlib import Path
 
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
+SKILLS_DIR = REPO_ROOT / "skills"
 README_PATH = REPO_ROOT / "README.md"
 REPO_SLUG = os.environ.get("SKILLS_REPO", "cameronmolen/skills")
 
@@ -42,7 +43,7 @@ def summarize(description: str) -> str:
 def find_skills() -> list[dict[str, str]]:
     skills: list[dict[str, str]] = []
 
-    for entry in REPO_ROOT.iterdir():
+    for entry in SKILLS_DIR.iterdir():
         if not entry.is_dir() or entry.name.startswith("."):
             continue
 
@@ -60,7 +61,7 @@ def find_skills() -> list[dict[str, str]]:
         skills.append(
             {
                 "name": name,
-                "path": f"{entry.name}/",
+                "path": f"skills/{entry.name}/",
                 "description": summarize(description),
             }
         )
