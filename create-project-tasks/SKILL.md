@@ -41,17 +41,25 @@ Parse the arguments: extract the Notion project URL and optional Figma URL from 
    - The team isn't clear from the project page
    - Multiple valid implementation approaches exist
 
-5. Confirm **granularity preference**:
-   - Feature-level (~6-8 tasks) — each task covers a major feature area
-   - Component-level (~10-12 tasks) — each task covers individual components
-
-6. Confirm whether **all designs are final** or if any sections are still in flux.
+5. Confirm whether **all designs are final** or if any sections are still in flux.
 
 ---
 
 ## Phase 3 — Define Tasks
 
-7. Break the project into implementable tasks at the chosen granularity.
+6. Break the project into implementable tasks as focused features to implement.
+   - Each task should represent a focused, reviewable feature or feature slice with clear user or system value.
+   - Do not ask the user to choose task granularity.
+   - Do not split tasks merely by individual UI components unless the component is independently valuable, independently testable, or large enough to be its own focused feature.
+   - If a feature spans multiple repositories, create one task per repository so each task has a clear code ownership boundary and can be implemented/reviewed independently.
+   - Keep related UI, state, validation, API integration, and tests together when they belong to the same focused feature and same repository.
+   - Split a feature into smaller tasks when it has separate rollout steps, separate repository ownership, independent dependencies, or enough complexity that one task would become difficult to review.
+
+7. Give each task a title with a stable number prefix so it can be easily correlated with the dependency graph and recommended implementation order.
+   - Use whole numbers for top-level tasks: `1. Task Title`, `2. Task Title`, `3. Task Title`.
+   - Use letter suffixes for closely related parallel tasks or repository-specific slices of the same feature: `2a. Web Task Title`, `2b. API Task Title`.
+   - Use the exact numbered title in the Notion task `Name` property, the task review summary, the dependency graph node labels, and the recommended order.
+   - Do not renumber tasks after presenting them unless the full task list and dependency graph are updated together.
 
 8. For each task, draft content following the template in `task-template.md` (located in this skill's directory). Each task must include:
    - **Description**: what needs to be built, key implementation details, existing code to reuse (with file paths)
@@ -86,8 +94,8 @@ Parse the arguments: extract the Notion project URL and optional Figma URL from 
 
 10. **Build a task dependency graph.** After defining all tasks, create a mermaid flowchart that shows how tasks depend on each other, plus a recommended implementation order.
 
-    - **Flowchart**: Use `flowchart TD` with short node labels (task names or abbreviations). Draw an edge `A --> B` when task B requires task A to be completed first.
-    - **Recommended order**: Below the graph, list a numbered sequence of steps. Group tasks that can be worked in parallel on the same step.
+    - **Flowchart**: Use `flowchart TD` with node labels that start with the same task number prefixes used in the task titles. Draw an edge `A --> B` when task B requires task A to be completed first.
+    - **Recommended order**: Below the graph, list a numbered sequence of implementation steps. Reference each task by its exact number prefix and title. Group tasks that can be worked in parallel on the same step.
 
     Example format (from a real project):
 
@@ -96,25 +104,25 @@ Parse the arguments: extract the Notion project URL and optional Figma URL from 
 
     ```mermaid
     flowchart TD
-        A[Service foundation and request client]
-        B[get_locations]
-        C[get_location]
-        D[create_reservation]
+        T1[1. Service foundation and request client]
+        T2a[2a. get_locations]
+        T2b[2b. get_location]
+        T3[3. create_reservation]
 
-        A --> B
-        A --> D
-        B --> C
+        T1 --> T2a
+        T1 --> T3
+        T2a --> T2b
     ```
 
     Recommended order:
-    1. Service foundation
-    2. `get_locations` (depends on foundation)
-    3. `get_location` and `create_reservation` (can be parallel)
+    1. `1. Service foundation and request client`
+    2. `2a. get_locations`
+    3. `2b. get_location` and `3. create_reservation` (can be parallel)
     ````
 
     Tips:
     - Every task should appear as a node. Isolated tasks (no dependencies) are fine — they just won't have edges.
-    - Keep node labels short but recognizable — use the task name or a clear abbreviation.
+    - Keep node labels short but recognizable, and always include the task number prefix.
     - The recommended order should call out which tasks can be parallelized at each step.
 
 11. **Present the full task list** to the user for review before creating anything. Show:
@@ -157,4 +165,3 @@ Parse the arguments: extract the Notion project URL and optional Figma URL from 
 
 - See `task-template.md` in this skill directory for the content template.
 - See `examples/example-task.md` for a concrete example of a well-formatted task.
-
