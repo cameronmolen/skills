@@ -40,11 +40,40 @@ Use `gh pr create` with the following:
 
 ### Description
 
-- Keep it brief and proportional to the change size.
-- For small/simple changes: 1-2 sentences.
-- For complex changes: up to 1 short paragraph.
-- If the PR touches several distinct features or bug fixes, include a short bulleted list of items.
-- Do NOT include verbose boilerplate, checklists, or headers. Just describe what changed and why.
+- Use this format:
+
+```md
+<!-- Description -->
+
+## Demo
+
+TODO: Add screenshots and/or videos for frontend-facing changes.
+
+## Related Notion ticket
+
+<!-- Link to Notion ticket -->
+
+<details>
+<summary>Design decisions and acceptance criteria</summary>
+
+<!-- Include full breakdown of architectural and design decisions and acceptance criteria here -->
+</details>
+```
+
+- Start with the description directly. Keep the description proportional to the change size:
+  - For small/simple changes: 1-2 sentences.
+  - For complex changes: up to 1 short paragraph.
+  - If the PR touches several distinct features or bug fixes, include a short bulleted list of items.
+- Include the `## Demo` section only for frontend-facing changes. Leave `TODO: Add screenshots and/or videos for frontend-facing changes.` in that section so the author can add a demo.
+- Omit the `## Demo` section for backend-only, infra-only, docs-only, test-only, or other non-frontend-facing changes.
+- In `## Related Notion ticket`, include the Notion ticket URL when one is provided or can be found from the branch name, commit messages, or task context.
+- If an `ENG-xxx` task ID was provided but no Notion ticket URL was provided, find the Notion ticket related to that task ID and include its URL.
+- If no Notion ticket is available after checking the provided URL, task ID, branch name, commit messages, and task context, write `N/A`.
+- Include the collapsible `Design decisions and acceptance criteria` section when the implementation involved meaningful product, architecture, data model, API, UI, testing, migration, or compatibility decisions that reviewers should understand.
+- Also include the collapsible section when acceptance criteria were provided by a ticket, plan, user request, design spec, or review thread and those criteria materially shaped the implementation.
+- Omit the collapsible section for trivial PRs where there are no meaningful design decisions and no acceptance criteria beyond the summary, such as copy changes, one-line fixes, dependency bumps, or mechanical cleanup.
+- When included, the collapsible section can describe in detail why certain choices were made in the implementation and list the acceptance criteria that guided the work.
+- Do NOT include empty placeholder comments in the final PR body. Replace placeholders with real content or `N/A` as appropriate.
 
 ### Command
 
