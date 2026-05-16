@@ -1,0 +1,5 @@
+#!/bin/sh
+set -eu
+
+python3 scripts/update-readme.py
+git add README.md
