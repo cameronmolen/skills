@@ -49,9 +49,7 @@ Use `gh pr create` with the following:
 
 TODO: Add screenshots and/or videos for frontend-facing changes.
 
-## Related Notion ticket
-
-<!-- Link to Notion ticket -->
+**Related Notion ticket:** <!-- Link to Notion ticket -->
 
 <details>
 <summary>Design decisions and acceptance criteria</summary>
@@ -66,7 +64,7 @@ TODO: Add screenshots and/or videos for frontend-facing changes.
   - If the PR touches several distinct features or bug fixes, include a short bulleted list of items.
 - Include the `## Demo` section only for frontend-facing changes. Leave `TODO: Add screenshots and/or videos for frontend-facing changes.` in that section so the author can add a demo.
 - Omit the `## Demo` section for backend-only, infra-only, docs-only, test-only, or other non-frontend-facing changes.
-- In `## Related Notion ticket`, include the Notion ticket URL when one is provided or can be found from the branch name, commit messages, or task context.
+- In `**Related Notion ticket:**`, include the Notion ticket URL when one is provided or can be found from the branch name, commit messages, or task context.
 - If an `ENG-xxx` task ID was provided but no Notion ticket URL was provided, find the Notion ticket related to that task ID and include its URL.
 - If no Notion ticket is available after checking the provided URL, task ID, branch name, commit messages, and task context, write `N/A`.
 - Include the collapsible `Design decisions and acceptance criteria` section when the implementation involved meaningful product, architecture, data model, API, UI, testing, migration, or compatibility decisions that reviewers should understand.
