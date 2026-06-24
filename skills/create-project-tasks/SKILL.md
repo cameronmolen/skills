@@ -10,6 +10,7 @@ argument-hint: <notion-project-url> [figma-url]
 Break down a Notion project page into well-defined, implementable tasks and create them in the Project Tasks database.
 
 **Arguments:**
+
 - `$ARGUMENTS` — first argument is the Notion project page URL (required), second is a Figma URL (optional)
 
 Parse the arguments: extract the Notion project URL and optional Figma URL from `$ARGUMENTS`.
@@ -74,13 +75,13 @@ Parse the arguments: extract the Notion project URL and optional Figma URL from 
 
 9. **Assign points** using this scale:
 
-   | Points | Effort |
-   |--------|--------|
-   | 1 | Half day |
-   | 2 | 1 day |
-   | 3 | 1.5–3 days |
-   | 5 | 3–4 days |
-   | 8 | 5–6 days |
+   | Points | Effort     |
+   | ------ | ---------- |
+   | 1      | Half day   |
+   | 2      | 1 day      |
+   | 3      | 1.5–3 days |
+   | 5      | 3–4 days   |
+   | 8      | 5–6 days   |
 
    **IMPORTANT — Keep tasks small.** The vast majority of tasks should be 1, 2, or 3 points. If a task feels like a 5 or 8, that's a strong signal it should be split into smaller, more focused tasks. Only use 5 points when the work is truly indivisible (e.g., a single complex algorithm or a tightly coupled migration). 8-point tasks should be extremely rare — essentially never used unless the user explicitly approves after you explain why it can't be split.
 
@@ -93,7 +94,6 @@ Parse the arguments: extract the Notion project URL and optional Figma URL from 
    If you end up with any 5+ point tasks, flag them in the review summary with a note explaining why they can't be further decomposed.
 
 10. **Build a task dependency graph.** After defining all tasks, create a mermaid flowchart that shows how tasks depend on each other, plus a recommended implementation order.
-
     - **Flowchart**: Use `flowchart TD` with node labels that start with the same task number prefixes used in the task titles. Draw an edge `A --> B` when task B requires task A to be completed first.
     - **Recommended order**: Below the graph, list a numbered sequence of implementation steps. Reference each task by its exact number prefix and title. Group tasks that can be worked in parallel on the same step.
 
@@ -149,13 +149,25 @@ Parse the arguments: extract the Notion project URL and optional Figma URL from 
 
 13. **Link each task to the project** by fetching the Project Tasks database to find the Project relation property, then updating each created task via the Notion MCP's update-page tool to set the Project relation to the source project page.
 
-14. **Add the dependency graph to the project page** using the Notion MCP's update-page tool. Append the mermaid flowchart and recommended order under a `## Ticket Dependency Graph` heading on the project page.
+14. **Set blocking relationships between tasks.** Using the dependency graph from Phase 3, update each task's `Blocking` relation property to reference the task(s) it blocks. For each edge `A --> B` in the graph (meaning B depends on A), add B to A's `Blocking` relation. Use the Notion MCP's update-page tool to set the `Blocking` relation property on each task that has downstream dependents, referencing the page IDs of the tasks it blocks.
 
-15. **Report back** with a summary table:
+15. **Add the dependency graph to the project page** using the Notion MCP's update-page tool. Append the mermaid flowchart and recommended order under a `## Ticket Dependency Graph` heading on the project page.
 
-    | # | Task Name | Points | Notion URL |
-    |---|-----------|--------|------------|
-    | 1 | ... | ... | [link](url) |
+16. **Add a filtered Project Tasks table to the project page.** Always add a linked table/database view for the Project Tasks data source on the source project page so the project page has a live task list after task creation.
+    - Use the Project Tasks data source: `collection://9bde6985-9747-4684-b969-c8ecec481b63`.
+    - Place it directly after the Acceptance Criteria callout.
+    - If the project page already has a `Project Tasks` linked view for this data source, update/reuse that view instead of adding a duplicate.
+    - Use a table layout/view named `Project Tasks`.
+    - Show exactly these properties, in this order: `Name`, `Status`, `Tags`, `Points/Effort/Complexity`, `Assignee`, `Sprint`.
+    - Filter it to only tasks whose `Project` relation contains the current source project page.
+    - Sort it by `Name` ascending.
+    - If the Notion MCP/runtime cannot create a linked database view directly, use the best available Notion page-update/view tool and report that limitation clearly instead of substituting a static Markdown table. The requirement is a live filtered Project Tasks table, not a one-time task summary.
+
+17. **Report back** with a summary table:
+
+    | #   | Task Name | Points | Notion URL  |
+    | --- | --------- | ------ | ----------- |
+    | 1   | ...       | ...    | [link](url) |
 
     Include the total points at the bottom.
 
