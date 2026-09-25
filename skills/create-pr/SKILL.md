@@ -1,48 +1,50 @@
 ---
 name: create-pr
-description: Create and monitor a pull request. Commits staged changes, pushes to remote, opens a PR with a concise title and description, then monitors it for CI failures, flaky checks, mergeability, and review comments until it is merged/closed, user help is required, or it reaches a clean handoff state. Use when the user wants to open a PR, push changes for review, says "create a PR", or asks to babysit, monitor, watch, shepherd, or keep an eye on a PR.
+description: Open a pull request for the current changes, then babysit it until it merges. Use when the user wants to open a PR, push changes for review, or babysit an existing PR.
 argument-hint: [ENG-xxx]
-allowed-tools: Bash, Read, Edit, MultiEdit, Glob, Grep, AskUserQuestion
+allowed-tools: Bash, Read, Edit, MultiEdit, Glob, Grep, AskUserQuestion, ToolSearch, mcp__notion__notion-fetch, mcp__notion__notion-search, mcp__notion__notion-update-page, mcp__claude_ai_Notion__notion-fetch, mcp__claude_ai_Notion__notion-search, mcp__claude_ai_Notion__notion-update-page
 ---
 
-Create a pull request for the current changes, then monitor it until the PR is ready for handoff or needs user direction. Follow these steps exactly:
+Work the steps in order.
+
+Arguments: `$ARGUMENTS` — an `ENG-xxx` task ID when one is given.
 
 ## 1. Determine the branch
 
-- Arguments provided: `$ARGUMENTS`
-- Check if an `ENG-xxx` task ID was provided in the arguments.
-- Check the current branch with `git branch --show-current`.
-- If already on a feature branch (i.e., not `main`, `master`, or `staging`), stay on it.
-- If on `main`/`master`/`staging`, create and check out a new branch:
-  - Examine the staged/unstaged changes with `git diff --stat` and `git diff --cached --stat` and come up with a brief, descriptive kebab-case branch name based on the code changes (e.g., `add-user-endpoint`, `fix-search-pagination`).
+- Read the current branch with `git branch --show-current`.
+- On a feature branch (anything but `main`, `master`, `staging`), stay on it.
+- On `main`/`master`/`staging`, read the changes with `git diff --stat` and `git diff --cached --stat`, then create and check out a kebab-case branch named for them (e.g. `add-user-endpoint`, `fix-search-pagination`).
 
-## 2. Commit changes
+Done when `git branch --show-current` reports a feature branch.
 
-- Check if there are uncommitted changes with `git status --porcelain`.
-- If there are unstaged changes, stage them with `git add -A`.
-- If there are staged changes to commit, create a commit with a clear, concise message describing the changes.
-- If everything is already committed, skip this step.
+## 2. Commit
 
-## 3. Push to remote
+`git status --porcelain` for what is outstanding, `git add -A` to stage it, then commit with a message describing the change.
 
-- Push the branch to origin: `git push -u origin HEAD`.
+Done when `git status --porcelain` comes back empty.
+
+## 3. Push
+
+`git push -u origin HEAD`
 
 ## 4. Create the PR
 
-Use `gh pr create` with the following:
-
 ### Title
 
-- If an `ENG-xxx` task ID was provided in the arguments, prefix the title with it.
-- Follow with a brief, title-case description of what the code change does.
-- Examples: `ENG-1000 Create Get User Endpoint`, `Fix Search Results Pagination`, `ENG-452 Add Email Verification Flow`
+An `ENG-xxx` prefix when a task ID was given, then a brief title-case summary of what the change does: `ENG-1000 Create Get User Endpoint`, `Fix Search Results Pagination`.
+
+Write the summary in plain language describing the user-facing symptom or outcome, not the internal mechanism, class/method name, or implementation detail — a non-engineer skimming the PR list should understand what changed and why it matters. Save the technical specifics for the description body.
+
+| Bad (internal/technical)                                                | Good (plain language)                                                          |
+| ----------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| Derive `reconcile_facility_listings` Presence Set From Partner Response | Partner Sync Error Wrongly Removes Available Units                             |
+| Extend `ListingVariations::Delete` with the Delete-audit Surface        | Update ListingVariation Delete Service to Record Delete History                |
+| Refactor `OrgMembership` Query to Fix N+1                               | Host Dashboard Takes 10+ Seconds to Load for Organizations with Many Locations |
 
 ### Description
 
-- Use this format:
-
 ```md
-<!-- Description -->
+<!-- Summary -->
 
 ## Demo
 
@@ -57,20 +59,127 @@ TODO: Add screenshots and/or videos for frontend-facing changes.
 </details>
 ```
 
-- Start with the description directly. Keep the description proportional to the change size:
-  - For small/simple changes: 1-2 sentences.
-  - For complex changes: up to 1 short paragraph.
-  - If the PR touches several distinct features or bug fixes, include a short bulleted list of items.
-- Include the `## Demo` section only for frontend-facing changes. Leave `TODO: Add screenshots and/or videos for frontend-facing changes.` in that section so the author can add a demo.
-- Omit the `## Demo` section for backend-only, infra-only, docs-only, test-only, or other non-frontend-facing changes.
-- In `**Related Notion ticket:**`, include the Notion ticket URL when one is provided or can be found from the branch name, commit messages, or task context.
-- If an `ENG-xxx` task ID was provided but no Notion ticket URL was provided, find the Notion ticket related to that task ID and include its URL.
-- If no Notion ticket is available after checking the provided URL, task ID, branch name, commit messages, and task context, write `N/A`.
-- Include the collapsible `Design decisions and acceptance criteria` section when the implementation involved meaningful product, architecture, data model, API, UI, testing, migration, or compatibility decisions that reviewers should understand.
-- Also include the collapsible section when acceptance criteria were provided by a ticket, plan, user request, design spec, or review thread and those criteria materially shaped the implementation.
-- Omit the collapsible section for trivial PRs where there are no meaningful design decisions and no acceptance criteria beyond the summary, such as copy changes, one-line fixes, dependency bumps, or mechanical cleanup.
-- When included, the collapsible section can describe in detail why certain choices were made in the implementation and list the acceptance criteria that guided the work.
-- Do NOT include empty placeholder comments in the final PR body. Replace placeholders with real content or `N/A` as appropriate.
+#### Summary
+
+When writing the summary, pick the smallest view that makes the key point clear.
+
+- Show logic or an algorithm as pseudocode:
+
+  ```text
+  on(save)
+    if content is unchanged
+      return cached result
+    write new content
+    return fresh result
+  ```
+
+- Show runtime control flow as a call tree:
+
+  ```text
+  submitForm
+    createSession
+      persistPrompt
+      launchAgent
+    navigateToSession
+  ```
+
+- Show UI structure as a component tree, including state and module boundaries that matter:
+
+  ```tsx
+  <SessionPage>(apps / example / src / routes / session.tsx);
+  useSessionEvents() < SessionToolbar > <RunSkillButton>(packages / ui);
+  ```
+
+- Show file responsibility or a broad refactor as a shallow file tree:
+
+  ```text
+  src/
+  ├── commands/       # parses user actions
+  ├── sessions/       # owns session state
+  └── transport/      # sends API requests
+  ```
+
+- Show component interaction, control flow, or data flow with Mermaid:
+
+  ```mermaid
+  sequenceDiagram
+      participant User
+      participant UI
+      participant Daemon
+      User->>UI: choose command
+      UI->>Daemon: send expanded prompt
+      Daemon-->>UI: stream result
+  ```
+
+- Use `diff` when the point is what changes and the surrounding shape already exists. Match the diff shape to the topic.
+
+For a component change:
+
+```diff
+<SessionPage>
+  useSessionEvents()
+  <SessionToolbar>
++    <RunSkillButton />
+  <SessionTimeline>
++    <SkillResultCard />
+```
+
+For a file-layout change:
+
+```diff
+src/
+├── commands/
++│   └── show-me.ts       # expands the slash command
+├── sessions/
+-└── transport.ts
++└── transport/
++    ├── client.ts
++    └── stream.ts
+```
+
+For a call-tree or call-stack change:
+
+```diff
+submitForm
+  createSession
+    persistPrompt
++    expandSkillMention
+    launchAgent
+-  navigateToSession
++  navigateToSession
++    subscribeToEvents
+```
+
+For a state or control-flow change:
+
+```diff
+on(save)
+-  write content
++  if content is unchanged
++    return cached result
++  write new content
++  invalidate cache
+```
+
+- Show the whole block when most of it is new, when omitted context would hide ownership or order, or when the user needs a copyable target shape:
+
+```ts
+function expandSkill(command: string): string {
+  const skillName = command.slice(1)
+  return `use the ${skillName} skill`
+}
+```
+
+##### Guidance
+
+- Place each visual next to the short text it supports. Keep only the calls, files, props, states, and boundaries needed to answer the user's current question or the options to resolve the current discussion point.
+- You may use one of these, you may use several, it is unlikely you will use all of them. Use your judgement and don't overwhelm the user.
+
+#### Other Description Sections
+
+- `## Demo` belongs to frontend-facing changes only; leave its TODO line in place for the author's screenshots. Backend, infra, docs, and test-only PRs drop the section.
+- `**Related Notion ticket:**` takes the ticket URL, found from the URL given, the `ENG-xxx` ID, the branch name, commit messages, or task context. `N/A` goes in only once all of those come up empty. Hold onto the page ID — step 5 writes back to it.
+- The collapsible section carries the design decisions reviewers need (product, architecture, data model, API, UI, testing, migration, compatibility) and the acceptance criteria that shaped the work — this is where the technical specifics belong. Trivial PRs — copy changes, one-line fixes, dependency bumps, mechanical cleanup — drop the section.
 
 ### Command
 
@@ -78,90 +187,35 @@ TODO: Add screenshots and/or videos for frontend-facing changes.
 gh pr create --title "<title>" --body "<description>"
 ```
 
-Capture the PR URL from `gh pr create` output. If the PR already exists, find it with `gh pr view --json url,state,number,headRefName,baseRefName` or an equivalent `gh pr status` check and use that PR as the monitoring target.
+When the PR already exists, `gh pr view --json url,state,number,headRefName,baseRefName` names the target instead.
 
-## 5. Monitor the PR
+Done when you hold a PR URL and every placeholder comment in the body has resolved to real content or `N/A`.
 
-After the PR exists, babysit it until exactly one of these stop conditions occurs:
+## 5. Append the PR to the Notion ticket
 
-- The PR is merged or closed.
-- User help is required.
-- Handoff milestone: CI is green, the PR is mergeable, and there are no unresolved actionable review items.
+Skip when step 4 turned up no ticket.
 
-Do not merge the PR. A green, mergeable, review-clean PR is a handoff milestone, not permission to merge.
+`PR(s)` is a free-text property on the Project Tasks data source (`collection://9bde6985-9747-4684-b969-c8ecec481b63`). It is **append-only**: Notion's update replaces the whole value, so every write carries the entries already there.
 
-### Core monitoring workflow
+1. Fetch the ticket and read `PR(s)` and `Status` from the `<properties>` block. When `PR(s)` reads back `<omitted />` or truncated, ask the user for its current contents — writing from an unconfirmed value loses whatever it held.
+2. Build the `PR(s)` value. Blank field: the new URL alone. Existing entries: those entries verbatim and in order, then `, ` and the new URL. New URL already present: the ticket is already linked, so skip the `PR(s)` write, but still check `Status` below. Any non-URL text carries over verbatim.
 
-1. Prefer a project-specific PR watcher if the repository provides one. Use continuous mode with `--watch` unless intentionally doing a one-shot diagnostic snapshot. If the watcher streams JSON snapshots with an `actions` list, inspect that list before doing anything else.
-2. If no watcher exists, poll with `gh` commands:
-   - `gh pr view <PR> --json url,state,number,headRefName,headRefOid,baseRefName,mergeable,mergeStateStatus,reviewDecision,isDraft,reviews,comments,statusCheckRollup`
-   - `gh pr checks <PR> --watch --fail-fast` when waiting on checks.
-   - `gh run list --branch <headRefName> --commit <headRefOid> --json databaseId,name,conclusion,status,url` when failed checks need run-level details.
-3. On every loop, check for newly surfaced review feedback before acting on CI failures or mergeability state.
-4. Verify mergeability and merge-conflict status alongside CI with `mergeable`, `mergeStateStatus`, `reviewDecision`, `state`, and `isDraft`.
-5. After any push or CI rerun, immediately return to the monitoring loop on the updated SHA/state.
+   ```
+   https://github.com/neiybor/rails-api/pull/11070, https://github.com/neiybor/rails-api/pull/11067
+   ```
 
-Maintain terminal/session ownership while monitoring is active. Keep consuming watcher output in the same turn. Do not leave a detached `--watch` process running and then end the turn as though monitoring were complete.
+3. Decide on `Status`. `Status` values on this data source: `Blocked`, `Inbound`, `Ready`, `In progress`, `In review`, `In verification`, `Abandoned`, `Done`. Move it to `In review` only when the current value is `Blocked`, `Inbound`, `Ready`, or `In progress` — those are the states linking a PR should advance out of. Leave `In review`, `In verification`, `Abandoned`, and `Done` untouched; each is either already past this point or a state a human parked it in on purpose, and this step never moves a ticket backward.
+4. Write with the Notion update-page tool: the page ID, `command: "update_properties"`, `properties` carrying `"PR(s)"` (when it changed) and `"Status": "In review"` (when step 3 called for it). Skip the call entirely when neither changed.
 
-### Review feedback
+Done when a re-fetch shows `PR(s)` holding every pre-existing entry plus the new URL and `Status` reflecting step 3's decision; report both alongside the ticket URL. A failed write is reported with the values you meant to write, and step 6 continues.
 
-When review feedback appears:
+## 6. Babysit the PR
 
-- Inspect the surfaced review items.
-- If a review item is actionable and clearly correct, patch the code locally, run appropriate focused checks, commit, and push.
-- After the fix is on GitHub, mark the associated review thread/comment as resolved.
-- If there is any question about whether to implement the requested change, stop and ask the user first.
-- If a human review item is non-actionable, already addressed, incorrect, or better handled with explanation, surface the item and your recommended response to the user.
-- Do not post replies to human-authored review comments or review threads unless the user explicitly confirms the exact response text.
+Read `BABYSITTING.md` now and run it.
 
-Use `gh pr view --json reviews,comments` for top-level feedback. If inline thread resolution matters, use `gh api graphql` to inspect unresolved review threads and resolve only threads that your pushed fix actually addressed.
+Done when the PR is merged or closed.
 
-If both actionable review feedback and failed checks are present, prioritize review feedback first. A new commit will retrigger CI, so avoid rerunning flaky checks on the old SHA unless intentionally deferring the review change.
+## Guardrails
 
-### CI failures
-
-When CI fails:
-
-- Inspect failed run logs and classify the failure.
-- If the failure is likely caused by the current branch, patch code locally, run relevant checks, commit, and push.
-- Do not patch random flaky tests, CI infrastructure failures, dependency outages, runner issues, or failures unrelated to the branch.
-- If the failure appears flaky or unrelated, rerun failed jobs with `gh run rerun <run-id> --failed` when possible.
-- If the failure is ambiguous or the safe next action is unclear, stop and ask the user for help.
-
-For flaky CI failures, rerun only the failed jobs when possible. Avoid broad reruns that hide useful signal unless the available tooling cannot retry failed jobs selectively.
-
-### Mergeability
-
-Check mergeability after reviews and CI are handled:
-
-- If the PR has merge conflicts, attempt to resolve them when the resolution is straightforward and local context is sufficient.
-- If conflict resolution requires product judgment, broad refactoring, or choosing between competing human-authored changes, stop and ask the user for help.
-- If the PR is green, mergeable, and review-clean, report the handoff milestone and stop without merging.
-
-### Committing and pushing monitoring fixes
-
-When making fixes:
-
-- Keep changes minimal and directly tied to CI, review, or mergeability issues surfaced on the PR.
-- Do NOT use `--no-verify` when committing or pushing.
-- Use clear commit messages that describe the CI or review fix.
-- Push to the PR branch.
-- If `--watch` was active before pausing to patch, commit, or push, relaunch `--watch` yourself immediately after pushing.
-
-### User help required
-
-Stop and ask the user before continuing when:
-
-- No target PR can be found.
-- A review item may or may not be desirable to implement.
-- A response to a human review comment/thread is needed.
-- CI failure classification is ambiguous and the next action could waste time or introduce risk.
-- Merge conflicts require judgment about intended behavior.
-- Required credentials, repository permissions, or tooling are missing.
-
-When asking for help, include the current PR URL, the blocker, what you inspected, and the smallest useful decision you need from the user.
-
-## Important
-
-- Do NOT use `--no-verify` when committing or pushing.
-- If any step fails, report the error and stop — do not retry blindly.
+- Commit and push through the hooks; `--no-verify` stays out of every command.
+- A failing step stops the run and reports the error rather than retrying blindly. Step 5 is the exception: report and carry on to step 6.

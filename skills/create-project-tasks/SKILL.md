@@ -1,6 +1,6 @@
 ---
 name: create-project-tasks
-description: Break down a Notion project into implementable tasks in the Project Tasks database. Creates tasks with descriptions, acceptance criteria, Figma links, and code location suggestions.
+description: Break down a Notion project into implementable tasks in the Project Tasks database. Grills the user on the design, then creates tasks with descriptions, acceptance criteria, Figma links, and code location suggestions.
 disable-model-invocation: true
 argument-hint: <notion-project-url> [figma-url]
 ---
@@ -15,6 +15,8 @@ Break down a Notion project page into well-defined, implementable tasks and crea
 
 Parse the arguments: extract the Notion project URL and optional Figma URL from `$ARGUMENTS`.
 
+The flow is four phases: gather context → grill the user → define tasks → create in Notion.
+
 ---
 
 ## Phase 1 — Gather Context
@@ -27,28 +29,51 @@ Parse the arguments: extract the Notion project URL and optional Figma URL from 
    - If the design has multiple pages/sections, fetch the structure first, then get screenshots for key sections.
    - If Figma MCP tools are not available, skip this step and note to the user that designs could not be fetched.
 
-3. **Explore the codebase** (if working in a codebase):
-   - Use the Explore agent to find relevant existing components, patterns, utilities, and types.
-   - Identify reusable code that tasks should reference.
+3. **Explore the codebase** when the project touches a repository you have open. Use the Explore agent to find relevant existing components, patterns, utilities, and types, and identify reusable code that tasks should reference. Skip it for projects with no codebase to read — Phase 2 dispatches further explorations on demand once you know which facts you actually need.
 
 ---
 
-## Phase 2 — Ask Clarifying Questions
+## Phase 2 — Grill the User
 
-4. Use `AskUserQuestion` to clarify before defining tasks. Ask when:
-   - Feature behavior is ambiguous or missing from the design
-   - There's no clear acceptance criteria for a section
-   - The design references interactions/flows not fully specified
-   - The team isn't clear from the project page
-   - Multiple valid implementation approaches exist
+Interview the user relentlessly until you reach a shared understanding of what to build. Map this as a **design tree**: every decision branches into the decisions that hang off it.
 
-5. Confirm whether **all designs are final** or if any sections are still in flux.
+4. Work the tree in **rounds**. The **frontier** is every decision whose prerequisites are already settled — the questions you can ask _now_ without guessing at answers you haven't heard yet. Ask the whole frontier in one round: number each question and give your recommended answer. Then wait for the user's answers before the next round.
+
+   Format a round like so:
+
+   ```
+   ❓ **Q1** — **<question title>**: <question body, may be multiple paragraphs, including multiple choices>
+
+   ➡️ <your recommended answer>
+
+   ---
+
+   ❓ **Q2** — **<question title>**: <question body, may be multiple paragraphs, including multiple choices>
+
+   ➡️ <your recommended answer>
+   ```
+
+5. Each round of answers reshapes the tree: settled decisions push the frontier outward and unblock questions that depended on them. Recompute the frontier and ask the next round. A question whose answer depends on another question still open in this round belongs to a _later_ round, not this one.
+
+6. Seed the tree with these branches, then follow wherever the answers lead:
+   - **Scope** — what this project includes, and what is explicitly deferred.
+   - **Behavior** — interactions, states, and flows the design or spec leaves unspecified: empty, loading, error, permission-denied.
+   - **Design finality** — which sections are final and which are still in flux.
+   - **Ownership** — which repositories the work lands in, and which team the project belongs to.
+   - **Acceptance** — what "done" looks like for each section, in terms the user would verify.
+   - **Rollout** — feature flags, migrations, backfills, staged releases, analytics.
+   - **Approach** — where multiple valid implementations exist, which one the user wants.
+
+7. Finding **facts** is your job, never the user's. When a frontier question needs a fact about the codebase or the environment, dispatch an Explore agent to find it rather than asking. Don't block on it: a running exploration is an unsettled prerequisite, so only the questions downstream of it wait for the agent to report — ask the rest of the frontier now. The **decisions** are the user's: put each to them and wait.
+
+8. The grill is done when the frontier is empty: every branch of the design tree visited, nothing left silently assumed. Get the user's explicit confirmation that you have reached a shared understanding before defining any tasks.
 
 ---
 
 ## Phase 3 — Define Tasks
 
-6. Break the project into implementable tasks as focused features to implement.
+9. Break the project into implementable tasks as focused features to implement.
+   - Every decision settled in the grill lands somewhere in the task list — in a description, in an acceptance criterion, or in an explicit out-of-scope note. Nothing settled in Phase 2 goes missing.
    - Each task should represent a focused, reviewable feature or feature slice with clear user or system value.
    - Do not ask the user to choose task granularity.
    - Do not split tasks merely by individual UI components unless the component is independently valuable, independently testable, or large enough to be its own focused feature.
@@ -56,44 +81,44 @@ Parse the arguments: extract the Notion project URL and optional Figma URL from 
    - Keep related UI, state, validation, API integration, and tests together when they belong to the same focused feature and same repository.
    - Split a feature into smaller tasks when it has separate rollout steps, separate repository ownership, independent dependencies, or enough complexity that one task would become difficult to review.
 
-7. Give each task a title with a stable number prefix so it can be easily correlated with the dependency graph and recommended implementation order.
-   - Use whole numbers for top-level tasks: `1. Task Title`, `2. Task Title`, `3. Task Title`.
-   - Use letter suffixes for closely related parallel tasks or repository-specific slices of the same feature: `2a. Web Task Title`, `2b. API Task Title`.
-   - Use the exact numbered title in the Notion task `Name` property, the task review summary, the dependency graph node labels, and the recommended order.
-   - Do not renumber tasks after presenting them unless the full task list and dependency graph are updated together.
+10. Give each task a title with a stable number prefix so it can be easily correlated with the dependency graph and recommended implementation order.
+    - Use whole numbers for top-level tasks: `1. Task Title`, `2. Task Title`, `3. Task Title`.
+    - Use letter suffixes for closely related parallel tasks or repository-specific slices of the same feature: `2a. Web Task Title`, `2b. API Task Title`.
+    - Use the exact numbered title in the Notion task `Name` property, the task review summary, the dependency graph node labels, and the recommended order.
+    - Do not renumber tasks after presenting them unless the full task list and dependency graph are updated together.
 
-8. For each task, draft content following the template in `task-template.md` (located in this skill's directory). Each task must include:
-   - **Description**: what needs to be built, key implementation details, existing code to reuse (with file paths)
-   - **Design reference (optional)**: include only when a real Figma URL or other concrete design artifact exists and is relevant to the task
-   - **Acceptance Criteria**: checkbox list of verifiable outcomes
-   - **Code suggestions**: file paths, component names, utilities to reuse
+11. For each task, draft content following the template in `task-template.md` (located in this skill's directory). Each task must include:
+    - **Description**: what needs to be built, key implementation details, existing code to reuse (with file paths)
+    - **Design reference (optional)**: include only when a real Figma URL or other concrete design artifact exists and is relevant to the task
+    - **Acceptance Criteria**: checkbox list of verifiable outcomes
+    - **Code suggestions**: file paths, component names, utilities to reuse
 
-   Additional rules:
-   - Do not include a design section for backend, API, infra, data, or other non-UI tasks unless there is an actual design artifact relevant to the work.
-   - Do not use the Notion project page URL as a substitute for a design link.
-   - If no design artifact exists, omit the design section entirely rather than adding placeholder text like "No Figma was provided."
+    Additional rules:
+    - Do not include a design section for backend, API, infra, data, or other non-UI tasks unless there is an actual design artifact relevant to the work.
+    - Do not use the Notion project page URL as a substitute for a design link.
+    - If no design artifact exists, omit the design section entirely rather than adding placeholder text like "No Figma was provided."
 
-9. **Assign points** using this scale:
+12. **Assign points** using this scale:
 
-   | Points | Effort     |
-   | ------ | ---------- |
-   | 1      | Half day   |
-   | 2      | 1 day      |
-   | 3      | 1.5–3 days |
-   | 5      | 3–4 days   |
-   | 8      | 5–6 days   |
+    | Points | Effort     |
+    | ------ | ---------- |
+    | 1      | Half day   |
+    | 2      | 1 day      |
+    | 3      | 1.5–3 days |
+    | 5      | 3–4 days   |
+    | 8      | 5–6 days   |
 
-   **IMPORTANT — Keep tasks small.** The vast majority of tasks should be 1, 2, or 3 points. If a task feels like a 5 or 8, that's a strong signal it should be split into smaller, more focused tasks. Only use 5 points when the work is truly indivisible (e.g., a single complex algorithm or a tightly coupled migration). 8-point tasks should be extremely rare — essentially never used unless the user explicitly approves after you explain why it can't be split.
+    **IMPORTANT — Keep tasks small.** The vast majority of tasks should be 1, 2, or 3 points. If a task feels like a 5 or 8, that's a strong signal it should be split into smaller, more focused tasks. Only use 5 points when the work is truly indivisible (e.g., a single complex algorithm or a tightly coupled migration). 8-point tasks should be extremely rare — essentially never used unless the user explicitly approves after you explain why it can't be split.
 
-   **Before assigning 5+ points**, always attempt to split the task first. Ask yourself:
-   - Can the UI and the data/logic layers be separate tasks?
-   - Can different sections or components be their own tasks?
-   - Can the happy path be one task and edge cases/polish be another?
-   - Can the form, validation, and submission be separate tasks?
+    **Before assigning 5+ points**, always attempt to split the task first. Ask yourself:
+    - Can the UI and the data/logic layers be separate tasks?
+    - Can different sections or components be their own tasks?
+    - Can the happy path be one task and edge cases/polish be another?
+    - Can the form, validation, and submission be separate tasks?
 
-   If you end up with any 5+ point tasks, flag them in the review summary with a note explaining why they can't be further decomposed.
+    If you end up with any 5+ point tasks, flag them in the review summary with a note explaining why they can't be further decomposed.
 
-10. **Build a task dependency graph.** After defining all tasks, create a mermaid flowchart that shows how tasks depend on each other, plus a recommended implementation order.
+13. **Build a task dependency graph.** After defining all tasks, create a mermaid flowchart that shows how tasks depend on each other, plus a recommended implementation order.
     - **Flowchart**: Use `flowchart TD` with node labels that start with the same task number prefixes used in the task titles. Draw an edge `A --> B` when task B requires task A to be completed first.
     - **Recommended order**: Below the graph, list a numbered sequence of implementation steps. Reference each task by its exact number prefix and title. Group tasks that can be worked in parallel on the same step.
 
@@ -125,7 +150,7 @@ Parse the arguments: extract the Notion project URL and optional Figma URL from 
     - Keep node labels short but recognizable, and always include the task number prefix.
     - The recommended order should call out which tasks can be parallelized at each step.
 
-11. **Present the full task list** to the user for review before creating anything. Show:
+14. **Present the full task list** to the user for review before creating anything. Show:
     - Task name
     - Points
     - Brief summary (1 sentence)
@@ -138,22 +163,23 @@ Parse the arguments: extract the Notion project URL and optional Figma URL from 
 
 ## Phase 4 — Create Tasks in Notion
 
-12. **Create all tasks** using the Notion MCP's create-pages tool with:
+15. **Create all tasks** using the Notion MCP's create-pages tool with:
     - **Parent**: `{"data_source_id": "9bde6985-9747-4684-b969-c8ecec481b63"}` (this is the "Project Tasks" database in Notion — if task creation fails, verify this ID still matches)
     - **Properties for each task**:
       - `Name` — task title (title property)
       - `Status` — `"Inbound"`
       - `Team` — team from the project page (select)
       - `Points/Effort/Complexity` — points as string: `"1"`, `"2"`, `"3"`, `"5"`, or `"8"`
+      - `Is Bug` — `"Not Bug"` for every task
     - **Content**: formatted per `task-template.md`
 
-13. **Link each task to the project** by fetching the Project Tasks database to find the Project relation property, then updating each created task via the Notion MCP's update-page tool to set the Project relation to the source project page.
+16. **Link each task to the project** by fetching the Project Tasks database to find the Project relation property, then updating each created task via the Notion MCP's update-page tool to set the Project relation to the source project page.
 
-14. **Set blocking relationships between tasks.** Using the dependency graph from Phase 3, update each task's `Blocking` relation property to reference the task(s) it blocks. For each edge `A --> B` in the graph (meaning B depends on A), add B to A's `Blocking` relation. Use the Notion MCP's update-page tool to set the `Blocking` relation property on each task that has downstream dependents, referencing the page IDs of the tasks it blocks.
+17. **Set blocking relationships between tasks.** Using the dependency graph from Phase 3, update each task's `Blocking` relation property to reference the task(s) it blocks. For each edge `A --> B` in the graph (meaning B depends on A), add B to A's `Blocking` relation. Use the Notion MCP's update-page tool to set the `Blocking` relation property on each task that has downstream dependents, referencing the page IDs of the tasks it blocks.
 
-15. **Add the dependency graph to the project page** using the Notion MCP's update-page tool. Append the mermaid flowchart and recommended order under a `## Ticket Dependency Graph` heading on the project page.
+18. **Add the dependency graph to the project page** using the Notion MCP's update-page tool. Append the mermaid flowchart and recommended order under a `## Ticket Dependency Graph` heading on the project page.
 
-16. **Add a filtered Project Tasks table to the project page.** Always add a linked table/database view for the Project Tasks data source on the source project page so the project page has a live task list after task creation.
+19. **Add a filtered Project Tasks table to the project page.** Always add a linked table/database view for the Project Tasks data source on the source project page so the project page has a live task list after task creation.
     - Use the Project Tasks data source: `collection://9bde6985-9747-4684-b969-c8ecec481b63`.
     - Place it directly after the Acceptance Criteria callout.
     - If the project page already has a `Project Tasks` linked view for this data source, update/reuse that view instead of adding a duplicate.
@@ -163,7 +189,7 @@ Parse the arguments: extract the Notion project URL and optional Figma URL from 
     - Sort it by `Name` ascending.
     - If the Notion MCP/runtime cannot create a linked database view directly, use the best available Notion page-update/view tool and report that limitation clearly instead of substituting a static Markdown table. The requirement is a live filtered Project Tasks table, not a one-time task summary.
 
-17. **Report back** with a summary table:
+20. **Report back** with a summary table:
 
     | #   | Task Name | Points | Notion URL  |
     | --- | --------- | ------ | ----------- |
