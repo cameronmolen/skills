@@ -141,7 +141,7 @@ Draft each finding's comment in the user's voice: a sentence or two naming the p
 
 Then make one AskUserQuestion call:
 
-- **Findings**: multi-select questions, up to four findings each. Each option's label is `#<n> <short name>`, its description is the consequence, and its `preview` is the exact comment body. With more than twelve findings, list them numbered in text and ask the user to reply with the numbers to post.
+- **Findings**: multi-select questions, up to three findings each. Each option's label is `#<n> <short name>`, its description is the consequence, and its `preview` is the exact comment body. End every findings question with a `No comments` option, described as posting none of that question's findings, so the user can leave the PR without review comments. With more than nine findings, list them numbered in text and ask the user to reply with the numbers to post, or `none`.
 - **Verdict**: Approve, Request changes, Comment only, or Hold (post nothing). Put your recommendation first, labeled `(Recommended)`.
 
 When the user adds notes to an option, treat them as edits to that comment. With no findings, ask only the verdict question.
