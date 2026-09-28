@@ -38,7 +38,7 @@ The last stdout line is one JSON object. Its `pr` field is a snapshot of state, 
 | `status`           | Do                                                                                                   |
 | ------------------ | ---------------------------------------------------------------------------------------------------- |
 | `events`           | Handle `events` (below), run the active loop to handoff, then relaunch the watcher.                  |
-| `merged`           | Report that the PR merged. Babysitting is over.                                                      |
+| `merged`           | Advance the Notion ticket (see On merge), then report that the PR merged. Babysitting is over.       |
 | `closed`           | Report that it closed without merging. Babysitting is over.                                          |
 | `already_watching` | A live watcher for this PR will wake you. Leave it running.                                          |
 | `error`            | `gh` kept failing, and `detail` holds the last error. Escalate: usually expired auth or lost access. |
@@ -52,6 +52,16 @@ Before patching, run `git pull --ff-only`, since someone else may have pushed du
 - `conflict`: the PR has stopped merging cleanly with its base. See Mergeability.
 
 When a judgment call lands on the user, relaunch the watcher **before** you ask, so feedback keeps being collected while they decide.
+
+### On merge
+
+A merged PR moves its Notion ticket from `In review` to `In verification`.
+
+1. Find the ticket: the page ID from SKILL.md step 5 when this session still holds it, otherwise the URL on the PR body's `**Related Notion ticket:**` line (`gh pr view <PR> --json body`). `N/A` or no link means there is no ticket, and On merge is done.
+2. Fetch the ticket and read `Status`. Move it only when it reads `In review`. Any other value stays, since the ticket was either never advanced by this skill or a human has already moved it on.
+3. Write with the Notion update-page tool: the page ID, `command: "update_properties"`, `properties: {"Status": "In verification"}`.
+
+Done when a re-fetch shows `Status` at `In verification`, or at the untouched value step 2 left; report it alongside the ticket URL. A failed write is reported with the value you meant to write.
 
 ## Review feedback
 

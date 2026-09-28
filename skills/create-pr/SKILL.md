@@ -178,7 +178,7 @@ function expandSkill(command: string): string {
 #### Other Description Sections
 
 - `## Demo` belongs to frontend-facing changes only; leave its TODO line in place for the author's screenshots. Backend, infra, docs, and test-only PRs drop the section.
-- `**Related Notion ticket:**` takes the ticket URL, found from the URL given, the `ENG-xxx` ID, the branch name, commit messages, or task context. `N/A` goes in only once all of those come up empty. Hold onto the page ID — step 5 writes back to it.
+- `**Related Notion ticket:**` takes the ticket URL, found from the URL given, the `ENG-xxx` ID, the branch name, commit messages, or task context. `N/A` goes in only once all of those come up empty. Hold onto the page ID — step 5 and BABYSITTING.md's On merge write back to it.
 - The collapsible section carries the design decisions reviewers need (product, architecture, data model, API, UI, testing, migration, compatibility) and the acceptance criteria that shaped the work — this is where the technical specifics belong. Trivial PRs — copy changes, one-line fixes, dependency bumps, mechanical cleanup — drop the section.
 
 ### Command
@@ -213,7 +213,7 @@ Done when a re-fetch shows `PR(s)` holding every pre-existing entry plus the new
 
 Read `BABYSITTING.md` now and run it.
 
-Done when the PR is merged or closed.
+Done when the PR is closed, or merged and On merge is done.
 
 ## Guardrails
 
