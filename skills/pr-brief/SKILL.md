@@ -12,6 +12,8 @@ A **brief** lets the reviewer decide a PR's future without reading its code. It 
 
 Arguments: `$ARGUMENTS` is a PR URL or number. With neither, use the PR for the current branch.
 
+Steps 1 through 5 run straight through, so the finished brief is the first thing the user sees. Your first question to the user comes in step 6, after the brief. Settle anything unclear before then by reading the worktree. When only the author can settle it, put it in the brief as a finding whose consequence depends on the answer.
+
 ## 1. Load the PR
 
 ```sh
@@ -56,7 +58,12 @@ Read every changed file in the worktree in full, beyond its hunks, and sort each
 
 The PR description gives the intended behavior. Where the code does something different, that mismatch is a finding.
 
-Done when every changed file is accounted for, either inside a named decision or as implementation detail.
+Then rate the PR's **merge danger**, meaning what it costs if the merge turns out wrong:
+
+- **Door**: a **two-way door** can be walked back, because a revert restores the state from before the merge. A **one-way door** can't be. Destructive actions (dropped columns, deleted data, irreversible migrations) and hard-to-reverse decisions (a contract that clients pick up before a rollback, emails or payments already sent) are one-way doors. A PR that is cheap to roll back is lower risk.
+- **Blast radius**: everything the merge could affect if it's wrong. Consider every surface the change reaches, beyond the code it touches, such as layout shift, breakages for consumers, and mobile responsiveness. The dependents you found for each decision are the starting point.
+
+Done when every changed file is accounted for, either inside a named decision or as implementation detail, and the merge danger names its door and every surface in its blast radius.
 
 ## 4. Hunt findings
 
@@ -86,6 +93,10 @@ The user reads the brief instead of the code. Every sentence should carry a deci
 ### What it does
 
 <Two or three plain-language sentences: the problem, and the outcome once this merges.>
+
+### Merge danger
+
+**<One-way | Two-way> door.** <What a revert restores, or what it can't undo.> **Blast radius:** <every surface the merge could affect if it's wrong.>
 
 ### Since your last review <!-- re-reviews only -->
 
@@ -134,6 +145,8 @@ A contract diff at the right grain:
 +  priceHistory: [Money!]!
  }
 ```
+
+Done when the whole brief, recommendation included, is in front of the user.
 
 ## 6. Ask what to post
 
