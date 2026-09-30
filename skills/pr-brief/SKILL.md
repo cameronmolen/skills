@@ -14,7 +14,7 @@ Arguments: `$ARGUMENTS` is a PR URL or number. With neither, use the PR for the 
 
 Steps 1 through 5 run straight through, so the finished brief is the first thing the user sees. Your first question to the user comes in step 6, after the brief. Settle anything unclear before then by reading the worktree. When only the author can settle it, put it in the brief as a finding whose consequence depends on the answer.
 
-## 1. Load the PR
+## 1. Load and link the PR
 
 ```sh
 gh pr view <PR> --json url,number,title,body,author,baseRefName,headRefOid,additions,deletions,changedFiles,files,reviews
@@ -37,6 +37,8 @@ gh api graphql -F owner=<owner> -F name=<repo> -F number=<n> -f query='
 ```
 
 This is a **re-review** when `reviews` holds one by the user. In that case the brief covers the change since the `commit.oid` of the user's latest review, and reports which of the user's earlier threads the author addressed. If the author merged the base in since then, the delta also carries base changes, so leave those out. If that commit can't be fetched because it was force-pushed away, brief the whole PR.
+
+Link the PR to the current thread (if the harness being used supports it).
 
 ## 2. Check out the head
 
@@ -84,7 +86,7 @@ Done when every decision from step 3 has been checked for all three kinds, and e
 The user reads the brief instead of the code. Every sentence should carry a decision, a consequence, or a verdict, so cut anything else. Link every location to the head commit (`https://github.com/<owner>/<repo>/blob/<headRefOid>/<path>#L<line>`) so the user can jump to the code when they need to.
 
 ```md
-## <PR title> · [<owner>/<repo>#<n>](<url>)
+## <PR title> · [<owner>/<repo>#<n>](url)
 
 @<author> · +<additions> −<deletions> across <changedFiles> files
 
@@ -112,7 +114,7 @@ The user reads the brief instead of the code. Every sentence should carry a deci
 
 ### Findings
 
-1. **Bug** · [`path:line`](<link>): <problem>, so <consequence>. _Fix:_ <smallest change that resolves it>.
+1. **Bug** · [`path:line`](link): <problem>, so <consequence>. _Fix:_ <smallest change that resolves it>.
 
 ### Implementation detail
 
@@ -125,15 +127,15 @@ With no findings, the Findings section reads `None.` Recommend **Request changes
 
 Pick the smallest view that shows the decision. Include only the fields, calls, and files the decision touches. A decision that one sentence fully explains gets no visual.
 
-| Decision                           | Visual                                                                  |
-| ---------------------------------- | ----------------------------------------------------------------------- |
+| Decision                           | Visual                                                                    |
+| ---------------------------------- | ------------------------------------------------------------------------- |
 | API or contract                    | `diff` of the contract before and after: signatures and fields, no bodies |
-| Data model                         | `diff` of the schema, or a Mermaid `erDiagram` when relations change    |
-| Flow across components or services | Mermaid `sequenceDiagram`, or a `diff` of the call tree                 |
-| Module boundary or file ownership  | `diff` of a shallow file tree, with a one-line comment per entry        |
-| New abstraction or pattern         | The interface as a short code block, plus one call site                 |
-| UI structure                       | `diff` of the component tree                                            |
-| Logic or an algorithm              | Pseudocode                                                              |
+| Data model                         | `diff` of the schema, or a Mermaid `erDiagram` when relations change      |
+| Flow across components or services | Mermaid `sequenceDiagram`, or a `diff` of the call tree                   |
+| Module boundary or file ownership  | `diff` of a shallow file tree, with a one-line comment per entry          |
+| New abstraction or pattern         | The interface as a short code block, plus one call site                   |
+| UI structure                       | `diff` of the component tree                                              |
+| Logic or an algorithm              | Pseudocode                                                                |
 
 A contract diff at the right grain:
 
@@ -145,8 +147,6 @@ A contract diff at the right grain:
 +  priceHistory: [Money!]!
  }
 ```
-
-Done when the whole brief, recommendation included, is in front of the user.
 
 ## 6. Ask what to post
 
