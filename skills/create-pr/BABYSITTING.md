@@ -57,7 +57,7 @@ When a judgment call lands on the user, relaunch the watcher **before** you ask,
 
 A merged PR moves its Notion ticket from `In review` to `In verification`.
 
-1. Find the ticket: the page ID from SKILL.md step 5 when this session still holds it, otherwise the URL on the PR body's `**Related Notion ticket:**` line (`gh pr view <PR> --json body`). `N/A` or no link means there is no ticket, and On merge is done.
+1. Find the ticket: the page ID from SKILL.md step 6 when this session still holds it, otherwise the URL on the PR body's `**Related Notion ticket:**` line (`gh pr view <PR> --json body`). `N/A` or no link means there is no ticket, and On merge is done.
 2. Fetch the ticket and read `Status`. Move it only when it reads `In review`. Any other value stays, since the ticket was either never advanced by this skill or a human has already moved it on.
 3. Write with the Notion update-page tool: the page ID, `command: "update_properties"`, `properties: {"Status": "In verification"}`.
 
