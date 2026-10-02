@@ -2,7 +2,7 @@
 name: create-pr
 description: Open a pull request for the current changes, then babysit it until it merges. Use when the user wants to open a PR, push changes for review, or babysit an existing PR.
 argument-hint: [ENG-xxx]
-allowed-tools: Bash, Read, Edit, MultiEdit, Glob, Grep, AskUserQuestion, ToolSearch, mcp__notion__notion-fetch, mcp__notion__notion-search, mcp__notion__notion-update-page, mcp__claude_ai_Notion__notion-fetch, mcp__claude_ai_Notion__notion-search, mcp__claude_ai_Notion__notion-update-page
+allowed-tools: Agent, Bash, Read, Edit, MultiEdit, Glob, Grep, AskUserQuestion, ToolSearch, mcp__notion__notion-fetch, mcp__notion__notion-search, mcp__notion__notion-update-page, mcp__claude_ai_Notion__notion-fetch, mcp__claude_ai_Notion__notion-search, mcp__claude_ai_Notion__notion-update-page
 ---
 
 Work the steps in order.
@@ -17,17 +17,31 @@ Arguments: `$ARGUMENTS` — an `ENG-xxx` task ID when one is given.
 
 Done when `git branch --show-current` reports a feature branch.
 
-## 2. Commit
+## 2. Check coding standards
+
+Skip when `git ls-files '*CODING_STANDARDS.md'` comes back empty.
+
+Dispatch one subagent on a cheap model (Sonnet, Luna, etc.) to make a quick pass over the change and fix what breaks the standards. Hand it:
+
+- the path to the `CODING_STANDARDS.md` file;
+- the change: `git add -A`, then `git diff --cached $(git merge-base HEAD origin/<base>)`, with `<base>` the repo's default branch;
+- the brief: every standard applied to the changed lines, each violation fixed in place, edits confined to code the diff touches; return each fix (file, standard, change) and each violation left unfixed with why.
+
+Read its report and its edits; revert any fix that changes behavior rather than conforming to a standard.
+
+Done when the subagent has reported and each of its fixes is reviewed.
+
+## 3. Commit
 
 `git status --porcelain` for what is outstanding, `git add -A` to stage it, then commit with a message describing the change.
 
 Done when `git status --porcelain` comes back empty.
 
-## 3. Push
+## 4. Push
 
 `git push -u origin HEAD`
 
-## 4. Create the PR
+## 5. Create the PR
 
 ### Title
 
@@ -178,7 +192,7 @@ function expandSkill(command: string): string {
 #### Other Description Sections
 
 - `## Demo` belongs to frontend-facing changes only; leave its TODO line in place for the author's screenshots. Backend, infra, docs, and test-only PRs drop the section.
-- `**Related Notion ticket:**` takes the ticket URL, found from the URL given, the `ENG-xxx` ID, the branch name, commit messages, or task context. `N/A` goes in only once all of those come up empty. Hold onto the page ID — step 5 and BABYSITTING.md's On merge write back to it.
+- `**Related Notion ticket:**` takes the ticket URL, found from the URL given, the `ENG-xxx` ID, the branch name, commit messages, or task context. `N/A` goes in only once all of those come up empty. Hold onto the page ID — step 6 and BABYSITTING.md's On merge write back to it.
 - The collapsible section carries the design decisions reviewers need (product, architecture, data model, API, UI, testing, migration, compatibility) and the acceptance criteria that shaped the work — this is where the technical specifics belong. Trivial PRs — copy changes, one-line fixes, dependency bumps, mechanical cleanup — drop the section.
 
 ### Command
@@ -191,9 +205,9 @@ When the PR already exists, `gh pr view --json url,state,number,headRefName,base
 
 Done when you hold a PR URL and every placeholder comment in the body has resolved to real content or `N/A`.
 
-## 5. Append the PR to the Notion ticket
+## 6. Append the PR to the Notion ticket
 
-Skip when step 4 turned up no ticket.
+Skip when step 5 turned up no ticket.
 
 `PR(s)` is a free-text property on the Project Tasks data source (`collection://9bde6985-9747-4684-b969-c8ecec481b63`). It is **append-only**: Notion's update replaces the whole value, so every write carries the entries already there.
 
@@ -207,9 +221,9 @@ Skip when step 4 turned up no ticket.
 3. Decide on `Status`. `Status` values on this data source: `Blocked`, `Inbound`, `Ready`, `In progress`, `In review`, `In verification`, `Abandoned`, `Done`. Move it to `In review` only when the current value is `Blocked`, `Inbound`, `Ready`, or `In progress` — those are the states linking a PR should advance out of. Leave `In review`, `In verification`, `Abandoned`, and `Done` untouched; each is either already past this point or a state a human parked it in on purpose, and this step never moves a ticket backward.
 4. Write with the Notion update-page tool: the page ID, `command: "update_properties"`, `properties` carrying `"PR(s)"` (when it changed) and `"Status": "In review"` (when step 3 called for it). Skip the call entirely when neither changed.
 
-Done when a re-fetch shows `PR(s)` holding every pre-existing entry plus the new URL and `Status` reflecting step 3's decision; report both alongside the ticket URL. A failed write is reported with the values you meant to write, and step 6 continues.
+Done when a re-fetch shows `PR(s)` holding every pre-existing entry plus the new URL and `Status` reflecting step 3's decision; report both alongside the ticket URL. A failed write is reported with the values you meant to write, and step 7 continues.
 
-## 6. Babysit the PR
+## 7. Babysit the PR
 
 Read `BABYSITTING.md` now and run it.
 
@@ -218,4 +232,4 @@ Done when the PR is closed, or merged and On merge is done.
 ## Guardrails
 
 - Commit and push through the hooks; `--no-verify` stays out of every command.
-- A failing step stops the run and reports the error rather than retrying blindly. Step 5 is the exception: report and carry on to step 6.
+- A failing step stops the run and reports the error rather than retrying blindly. Step 6 is the exception: report and carry on to step 7.
