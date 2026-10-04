@@ -4,7 +4,7 @@ Set this up once, during bootstrap.
 
 ## The constraint nothing works around
 
-**Nothing available can wake a model without spending tokens.** A launchd script cannot push a message into a T3 thread. There is no `t3` CLI on the machine (checked: `t3`, `t3-code`, `~/.local/bin`, the app bundle). There is a local server descriptor at `~/.t3/dev/server-runtime.json` carrying a host and port, but its API is undocumented and unversioned, so building the loop on it would break silently on any nightly.
+**Nothing available wakes the orchestrator on a merge without spending tokens.** T3 Code's `watch_pull_request` wakes a thread for free on checks, comments, and conflicts, but a merge ends the watch silently. Workers already use it through `create-pr`, so CI and review feedback reach the thread that owns the branch. A launchd script cannot push a message into a T3 thread. There is no `t3` CLI on the machine. There is a local server descriptor at `~/.t3/dev/server-runtime.json` carrying a host and port, but its API is undocumented and unversioned, so building the loop on it would break silently on any nightly.
 
 Token efficiency therefore comes from making the polling free and the wakes rare, not from eliminating wakes. Both designs below accept that. They differ in who does the waking.
 
@@ -20,7 +20,7 @@ Zero tokens while idle. The operator is the wake signal, which costs nothing and
 
 ### Why two calls and not one
 
-Measured 2026-08-26 on `neiybor/rails-api`:
+On `neiybor/rails-api`:
 
 | Call                                                | Result                        |
 | --------------------------------------------------- | ----------------------------- |
@@ -62,7 +62,7 @@ schedule_task({
 
 Pass `schedule` as a structured object, never as JSON text.
 
-**`bindToCurrentThread: true` is mandatory here, not a preference.** Cross-project read and steer resolve only for threads the caller created, so a fresh thread per run created none of the workers and can reach none of them. It would wake up unable to do the one thing it woke for.
+**`bindToCurrentThread: true` is mandatory here, not a preference.** An unbound run starts a fresh thread in a new worktree cut from `main`, a branch rails-api does not use, carrying none of this thread's context. A bound run lands here, beside the conversation that launched the workers.
 
 The ten-minute interval is intentional. The heartbeat reads only active workers, incrementally from each ticket's `last_read_position`, and leaves PR and CI polling to the launchd poller. It should not use the `WAKE` file as a gate, because its job is to notice child-thread progress even when GitHub has not changed. Run both under `--auto-launch`: the poller watches GitHub, and the heartbeat watches worker conversations.
 

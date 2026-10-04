@@ -2,7 +2,7 @@
 name: create-pr
 description: Open a pull request for the current changes, then babysit it until it merges. Use when the user wants to open a PR, push changes for review, or babysit an existing PR.
 argument-hint: [ENG-xxx]
-allowed-tools: Agent, Bash, Read, Edit, MultiEdit, Glob, Grep, AskUserQuestion, ToolSearch, mcp__notion__notion-fetch, mcp__notion__notion-search, mcp__notion__notion-update-page, mcp__claude_ai_Notion__notion-fetch, mcp__claude_ai_Notion__notion-search, mcp__claude_ai_Notion__notion-update-page
+allowed-tools: Agent, Bash, Read, Edit, MultiEdit, Glob, Grep, AskUserQuestion, ToolSearch, mcp__notion__notion-fetch, mcp__notion__notion-search, mcp__notion__notion-update-page, mcp__claude_ai_Notion__notion-fetch, mcp__claude_ai_Notion__notion-search, mcp__claude_ai_Notion__notion-update-page, mcp__t3-code__link_pull_request, mcp__t3-code__watch_pull_request, mcp__t3-code__unwatch_pull_request
 ---
 
 Work the steps in order.
@@ -203,7 +203,9 @@ gh pr create --title "<title>" --body "<description>"
 
 When the PR already exists, `gh pr view --json url,state,number,headRefName,baseRefName` names the target instead.
 
-Done when you hold a PR URL and every placeholder comment in the body has resolved to real content or `N/A`.
+Link the PR to this thread with `link_pull_request` as soon as you hold its URL, so T3 Code shows its status beside the thread.
+
+Done when you hold a linked PR URL and every placeholder comment in the body has resolved to real content or `N/A`.
 
 ## 6. Append the PR to the Notion ticket
 

@@ -10,7 +10,7 @@ Launch it as soon as the review posts. The first launch counts everything alread
 python3 <this-skill-dir>/watch-response.py <PR-URL>
 ```
 
-Tell the user in one line that you'll re-brief the PR when its author responds. If other PRs from the same wake are still waiting to be briefed (a `watch-review-requests` wake), carry on with the next one. Otherwise, end your turn. `--help` covers what counts as a response and how a burst of pushes becomes one wake. While the monitor holds the PR, `watch-review-requests` stays quiet about its re-requests, so each response produces exactly one brief.
+Tell the user in one line that you'll re-brief the PR when its author responds, then end your turn. `--help` covers what counts as a response and how a burst of pushes becomes one wake. While the monitor holds the PR, `watch-review-requests` stays quiet about its re-requests, so each response produces exactly one brief.
 
 The monitor dies with the session. Running `pr-brief` on the PR in a new session briefs it again and relaunches the monitor, and the monitor's state carries over.
 
