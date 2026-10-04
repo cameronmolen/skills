@@ -1,12 +1,10 @@
 # Worker threads
 
-## What `t3_thread_start` gives you
+## What `t3_thread_launch` gives you
 
-Verified 2026-08-26 against the t3code source (`packages/contracts/src/orchestratorMcp.ts`, `apps/server/src/mcp/OrchestratorMcpService.ts`).
+`t3_thread_launch` creates one top-level thread and binds its workspace before the agent's first turn. Three arguments decide where and what it runs:
 
-`t3_thread_start` and `create_threads` both take two arguments that decide where a worker runs:
-
-- **`projectId`** targets another project. Omitted, the worker inherits the caller's project. Ids come from the `projects` array in `orchestrator_capabilities`, each entry carrying `projectId`, `name`, and `rootPath`.
+- **`projectId`** names the project. Omitted, the worker inherits the caller's project, which is where it belongs (see below). Ids come from `t3_project_list`.
 - **`workspaceStrategy`** decides the checkout. Three shapes:
 
   | `type`              | Fields                                   | Effect                                                   |
@@ -15,34 +13,27 @@ Verified 2026-08-26 against the t3code source (`packages/contracts/src/orchestra
   | `existing_worktree` | `worktreePath`, `branch?`                | Starts the thread in a worktree that already exists      |
   | `root`              | `branch?`                                | Starts the thread in the project's root checkout         |
 
-**Always pass `workspaceStrategy` explicitly.** The default is inherit-shaped and hostile to this skill. When you omit it and the target project matches the caller's, the worker inherits the caller's workspace, so an orchestrator already sitting in a worktree drops every worker into that same checkout. Four workers sharing one working tree corrupts all four. Cross-project defaults to `root`, which is no better: it puts the worker in the shared main checkout.
+- **`message`** is the worker's first prompt, delivered once the worktree is ready.
 
-So one worker is one call, with `baseRef` set to the branch below it in the stack. The full shape is in [The launch prompt](#the-launch-prompt).
+**Always pass `workspaceStrategy` explicitly.** Omitted, it means `root`: the project's main checkout, never the caller's worktree. Four workers sharing one working tree corrupts all four. So one worker is one call, with `baseRef` set to the branch below it in the stack. The full shape is in [The launch prompt](#the-launch-prompt).
+
+The launch needs a full-access or default-mode caller and has no retry key. It returns `threadId` once accepted, while the worktree may still be preparing. After an error or a lost response, find the thread with `t3_thread_list` (`titleContains: "<ENG-####>"`) before launching again, or you get two workers on one ticket.
 
 The worker is in its own worktree on its own branch before its first turn. There is no handoff step, and `t3_worktree_handoff` is not part of this design.
 
 **Every worktree is a worktree of the one project clone, so they share a ref store and an object database.** That is what lets a worker branch off a sibling's branch that has never been pushed, and what lets `refs/stack-base/<branch>` be read from anywhere. It is also why branch names must stay unique across workers, which `branchFor` guarantees by keying on the ticket id.
 
-## What is still project-scoped
+## Everything after launch is project-scoped
 
-**`t3_thread_list` never returns threads from another project.** It has no `projectId` parameter and filters on the caller's project. So a cross-project worker is invisible to listing.
+`t3_thread_read`, `t3_thread_send`, `t3_thread_wait`, `t3_thread_interrupt`, and `t3_thread_list` resolve threads only inside the caller's project, even threads the caller launched. A worker launched into another project is one the orchestrator can never read or steer. So the orchestrator runs from a thread in the target project, and its workers inherit that project.
 
-**The ledger is therefore the only index of your workers.** Record `thread_id` the moment `t3_thread_start` returns, with `scripts/stack.mjs <PLN> push <ENG-####> --thread <id>`. Lose it and the worker is unreachable, because you cannot enumerate your way back to it. The same call appends the ticket to the stack, so skipping it also leaves the next launch branching off a stale tip.
-
-**Reading and steering cross-project workers does work, but only ones you launched yourself.** `loadScopedThread` resolves a thread by the caller's project id unless the caller created it, and a thread it created resolves directly. `t3_thread_read`, `t3_thread_send`, `t3_thread_wait`, and `t3_thread_interrupt` all go through that path. Two consequences:
-
-- Launch every worker from the orchestrator thread. A worker launched by anything else is one you can never read.
-- The scheduled-task heartbeat must use `bindToCurrentThread: true`. A fresh thread per run created none of the workers and can reach none of them.
+**The ledger is the index of your workers.** Record `thread_id` the moment `t3_thread_launch` returns, with `scripts/stack.mjs <PLN> push <ENG-####> --thread <id>`. The same call appends the ticket to the stack, so skipping it also leaves the next launch branching off a stale tip. `t3_thread_list` with `titleContains` can recover a lost id, but only because every worker's title starts with its ticket id.
 
 `t3_thread_read` returns `thread.worktreePath` and `thread.branch`, so you can confirm a worker landed where you put it without asking it.
 
-`create_threads` batches up to `maxBatchThreads: 20` and takes `projectId` and `workspaceStrategy` per entry, but batching cannot build a stack: each entry's `baseRef` is the branch the entry before it created, which does not exist until that call returns. Launch one ticket at a time with `t3_thread_start` and push each to the stack as it returns.
+Launch one ticket at a time with `t3_thread_launch` and push each to the stack as it returns. Each entry's `baseRef` is the branch the launch before it created, and `create_threads` would put every worker in the orchestrator's own checkout anyway.
 
 Use `delegate_task` for child work the orchestrator owns, such as a graph-extraction pass or a divergence diff. Its result comes back to the orchestrator rather than to a worker. Do not use it for tickets. A delegated task is a subagent of this thread, and a ticket needs a top-level thread the operator can open, read, and steer.
-
-## Check the build first
-
-`projectId` and `workspaceStrategy` are recent. Call `orchestrator_capabilities` during bootstrap and confirm the result carries a `projects` array. If it does not, the running app predates cross-project launch: tell the operator to update T3 Code, and run the orchestrator from the target project in the meantime, since same-project launch still works.
 
 ## Claim before launch
 
@@ -56,7 +47,7 @@ ntn datasources query 86133bd6-b63a-4993-9bfc-90f56c5a31c5 \
 
 Use the `Team`, `Start Date`, and `End Date` properties as the authority. Sprint names are inconsistent. If the query does not resolve to one active Host sprint, launch nothing and report the lookup as blocked.
 
-Immediately before each `t3_thread_start`, use `notion-update-page` to set the ticket's `Status` to `In progress`, `Assignee` to `Cameron Molen`, and `Sprint` to that sprint. The `Sprint` relation value must be the sprint's full Notion page URL, not its UUID. Do this for every ticket you launch, not for the launchable list you merely report.
+Immediately before each `t3_thread_launch`, use `notion-update-page` to set the ticket's `Status` to `In progress`, `Assignee` to `Cameron Molen`, and `Sprint` to that sprint. The `Sprint` relation value must be the sprint's full Notion page URL, not its UUID. Do this for every ticket you launch, not for the launchable list you merely report.
 
 Fetch the ticket after the update and verify all three fields. Claim first, launch second. If the write or verification fails, do not launch the worker. Report the ticket as blocked on the claim instead of starting a worker Notion does not show as owned.
 
@@ -65,17 +56,17 @@ Fetch the ticket after the update and verify all three fields. Claim first, laun
 Run `scripts/stack.mjs <PLN> plan <ENG-####>` first. It returns `branch`, `base_branch`, and `start_from_origin` for this launch, computed against the current stack tip. Do not derive any of them yourself.
 
 ```
-t3_thread_start({
-  projectId: "<rails-api project id>",
+t3_thread_launch({
+  projectId: "<project.project_id from the ledger>",
   workspaceStrategy: {type: "worktree", baseRef: "<base_branch>", branch: "<branch>", startFromOrigin: <start_from_origin>},
-  prompt: "<below>",
+  message: "<below>",
   title: "<ENG-####> <ticket name>"
 })
 ```
 
 `start_from_origin` is true only at the stack floor, where `base_branch` is `staging` and the remote tip is what you want. Above the floor the base is another worker's branch, which may exist only locally, so it is false.
 
-The moment `t3_thread_start` returns, run `scripts/stack.mjs <PLN> push <ENG-####> --thread <thread-id>`. That appends the ticket to the stack, freezes its base, and sets `status` to `running`. **Until you run it the stack tip is stale, and the next launch will branch off the wrong ticket.**
+The moment `t3_thread_launch` returns, run `scripts/stack.mjs <PLN> push <ENG-####> --thread <thread-id>`. That appends the ticket to the stack, freezes its base, and sets `status` to `running`. **Until you run it the stack tip is stale, and the next launch will branch off the wrong ticket.**
 
 ```
 You own <ENG-####>: <ticket name>
@@ -160,7 +151,7 @@ Resolve any conflicts in your own commits only, and confirm CI goes green again.
 Reply RESTACKED <branch> when the force-push has landed.
 ```
 
-**Work the list strictly in order and wait for each `RESTACKED` before sending the next.** Entry N+1 rebases onto entry N's new tip. Send them together and N+1 rebases onto a branch that is about to move under it.
+**Work the list strictly in order and wait for each `RESTACKED` before sending the next.** Entry N+1 rebases onto entry N's new tip. Send them together and N+1 rebases onto a branch that is about to move under it. Wait with `t3_thread_wait` on the worker's `thread_id`, with a bounded `timeoutMs`, then read its reply with `t3_thread_read` (`view: "messages"`, `afterPosition` from the ledger). A timeout leaves the worker running, so wait again rather than resending.
 
 `stack.mjs restack` writes the new `base_branch` into the ledger as it plans, so the plan is not idempotent in the sense of being re-runnable per worker — but calling it with no ticket id is safe and returns exactly the entries whose ledger base and stack position still disagree. Use that to recover a half-finished cascade.
 

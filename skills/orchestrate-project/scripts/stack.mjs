@@ -106,7 +106,7 @@ if (cmd === "push") {
   }
   const thread = arg("--thread")
   if (!thread) {
-    console.error("push needs --thread <thread-id> from t3_thread_start")
+    console.error("push needs --thread <thread-id> from t3_thread_launch")
     process.exit(2)
   }
 

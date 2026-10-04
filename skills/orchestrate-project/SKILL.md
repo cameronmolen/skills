@@ -51,7 +51,7 @@ Three rules hold it together.
 | ----------------------------------------------- | ----------------------------------------------------------------------------- |
 | `stack.mjs <PLN> view`                          | The stack bottom-to-top, and which entry is mergeable now                     |
 | `stack.mjs <PLN> plan <ENG-####>`               | The branch, base branch, and `startFromOrigin` for a launch. Read-only        |
-| `stack.mjs <PLN> push <ENG-####> --thread <id>` | Appends to the stack and freezes that base. Run right after `t3_thread_start` |
+| `stack.mjs <PLN> push <ENG-####> --thread <id>` | Appends to the stack and freezes that base. Run right after `t3_thread_launch` |
 | `stack.mjs <PLN> restack [<ENG-####>]`          | The ordered rebase plan after a merge, one exact command per worker           |
 
 **The cost of a stack is that its bottom is a single point of blockage.** An unmerged PR at position 0 holds every PR above it. When the bottom stalls — CI red, changes requested, a gate — say so at the top of the report, because it is the one merge that unblocks the whole project.
@@ -66,9 +66,9 @@ Per-ticket fields: `name`, `notion_id`, `status`, `notion_status`, `blocked_by[]
 
 `relay` holds the request currently out with that worker — `{token, request, sent_at}` — and clears when the worker replies with the token. It is how a relay survives a summarized context.
 
-Project-level fields include `project_id`, the target project's id from `orchestrator_capabilities`, plus `chain` and `stack` from the section above.
+Project-level fields include `project_id`, the target repo's T3 project id from `t3_project_list`, plus `chain` and `stack` from the section above.
 
-Write `thread_id` and `launched_at` the moment `t3_thread_start` returns. Staleness is measured from `launched_at`, and **`t3_thread_list` cannot see workers in another project**, so a worker whose id you failed to record is unreachable with no way to enumerate it back.
+Write `thread_id` and `launched_at` the moment `t3_thread_launch` returns. Staleness is measured from `launched_at`, and every later read, ping, and relay addresses the worker by that id.
 
 `status` is orchestrator-owned and distinct from Notion's `Status`:
 
@@ -93,9 +93,9 @@ An operator request between ticks is not a phase. Relay it, then carry on.
 
 1. Resolve the project URL to its `PLN-####` and page id. Refuse to proceed if `~/.orchestrate-project/<PLN>/ledger.json` already exists. Say so and suggest `tick` instead.
 
-   Then call `orchestrator_capabilities` and pick the target repo's `projectId` from its `projects` array. A result with no `projects` array means the running build predates cross-project launch, so say so and fall back to running from the target project.
-
    The default repo is `neiybor/rails-api`. Ask the operator when the project's tickets are tagged for another one.
+
+   Then confirm this thread runs in the target repo's T3 project: find the repo's entry in `t3_project_list` and check it matches the main workspace root `t3_worktree_status` reports. When it doesn't, stop and tell the operator to rerun from a thread in that project. Record the project's id for `bootstrap-ledger.mjs --project-id`.
 
 2. Query the ticket graph and detect gates, following [`NOTION-GRAPH.md`](NOTION-GRAPH.md). That file carries the verified field traps, and the query is wrong without it.
 
@@ -127,11 +127,11 @@ Run all four steps in order, every tick. Read [`WORKER.md`](WORKER.md) for the l
    - Default, operator-gated: list what is launchable and stop. Launch nothing.
    - `--auto-launch`: launch up to the remaining capacity.
 
-   **Launch in the order `frontier.mjs` returns**, one at a time, and run `stack.mjs <PLN> push <ENG-####> --thread <id>` after each `t3_thread_start` returns. Each launch changes the stack tip, so the next ticket's base is not knowable until the one before it is recorded. `frontier.mjs` reports only the first entry's base for that reason.
+   **Launch in the order `frontier.mjs` returns**, one at a time, and run `stack.mjs <PLN> push <ENG-####> --thread <id>` after each `t3_thread_launch` returns. Each launch changes the stack tip, so the next ticket's base is not knowable until the one before it is recorded. `frontier.mjs` reports only the first entry's base for that reason.
 
    Either way, **never launch a `gated` ticket.** A gate clears only when the operator says so, by name. A gated ticket that sits below unlaunched work also caps the stack: nothing that depends on it can launch until the gate clears.
 
-   **Claim each ticket you actually launch.** Immediately before `t3_thread_start`, set its Notion `Status` to `In progress`, `Assignee` to `Cameron Molen`, and `Sprint` to the current active Host sprint. Claim only tickets you are about to launch, never the whole launchable list. See [`WORKER.md`](WORKER.md).
+   **Claim each ticket you actually launch.** Immediately before `t3_thread_launch`, set its Notion `Status` to `In progress`, `Assignee` to `Cameron Molen`, and `Sprint` to the current active Host sprint. Claim only tickets you are about to launch, never the whole launchable list. See [`WORKER.md`](WORKER.md).
 
 4. **Report.** Lead with the stack from `scripts/frontier.mjs <PLN> --table`, bottom-to-top, marking the entry that is mergeable now. Then one table: merged since last tick, open awaiting merge, running, launchable, held, gated, zombie, outstanding `relay`. Then the ask, naming the specific decisions and merges only a human can do.
 
@@ -168,7 +168,7 @@ Then delete any scheduled task via `list_scheduled_tasks` and `delete_scheduled_
 - **Merge the stack bottom-up, never out of order.** An entry merged from the middle strands a base for everything below it and squashes its parents' commits into `staging` twice. A green PR above the bottom is not an ask; `poll-prs.mjs` files it as `stack_green` rather than `ready_to_merge`.
 - **Every PR targets its `base_branch`, not the repo default.** `gh pr create` defaults to the default branch, so the worker passes `--base` explicitly. A PR silently opened against `staging` shows every parent's diff and cannot be reviewed.
 - **Shipped to prod is a grep for a distinctive symbol on `origin/master`.** Never SHA ancestry. `staging` is merged into `master`, so `git merge-base --is-ancestor` returns false for code that is live.
-- **Launch every worker from the orchestrator thread, with `projectId` and an explicit `workspaceStrategy`.** You can run this skill from any project, because `t3_thread_start` targets one. Two rules make that safe. Always pass `workspaceStrategy`, since the default drops the worker into the caller's own checkout. And launch the workers yourself, because cross-project read and steer only resolve for threads the caller created. Both are in [`WORKER.md`](WORKER.md).
+- **Run the orchestrator from the target project, and launch every worker into it with `t3_thread_launch` and an explicit `workspaceStrategy`.** Workers in another project can't be read or steered, and workers without a `workspaceStrategy` share the main checkout. Both are in [`WORKER.md`](WORKER.md).
 
 ## Polling
 

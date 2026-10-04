@@ -3,9 +3,9 @@
 Babysitting ends when the PR is **merged or closed**. Until then it alternates between two modes:
 
 - **Active**: work the PR to **handoff**, meaning CI green, mergeable, and every piece of review feedback **answered** (see Review feedback).
-- **Watching**: `watch-pr.py` waits on reviewers and CI for you at no token cost, for hours or days. Each time it exits, you **wake** and go back to Active.
+- **Watching**: T3 Code's `watch_pull_request` waits on reviewers and CI for you at no token cost, for hours or days. Each time it messages you, you **wake** and go back to Active.
 
-Handoff is where watching begins. Merging is always the user's call.
+Babysitting starts with two things, before the first active pass: call `watch_pull_request` with the PR URL, and launch the merge waiter (see Watching). Only comments posted after the call wake you, so watching first leaves no gap between what the active loop reads and what the watch reports. Handoff is where your turn ends and the watch takes over. Merging is always the user's call.
 
 ## Active loop
 
@@ -21,37 +21,32 @@ Own the terminal for the whole active loop. Consume watcher output in the same t
 
 ## Watching
 
-Launch the watcher from this skill folder with the Bash tool and `run_in_background: true`:
+At handoff, tell the user in a line or two that the PR is at handoff and being watched, then end your turn. T3 Code checks the PR every minute and wakes you with a message, so its silence means there is nothing to do. It skips comments from the user's GitHub account, so your own replies won't wake you. The watch lives on the thread's PR link and survives app restarts.
+
+A merge or close ends the watch **without waking you**. The **merge waiter** catches it, launched with the Bash tool and `run_in_background: true`:
 
 ```sh
-python3 <this-skill-dir>/watch-pr.py <PR-URL>
+while [ "$(gh pr view <PR-URL> --json state --jq .state)" = OPEN ]; do sleep 300; done; gh pr view <PR-URL> --json state,mergedAt
 ```
 
-Tell the user in a line or two that the PR is at handoff and being watched, then end your turn. The harness wakes you with the watcher's output when it exits, so its silence means there is nothing to do. `watch-pr.py --help` covers what it reports and how it batches bursts of activity into one wake. It skips your own replies, so posting them won't wake you.
-
-The watcher dies with the session. Running `/create-pr` again on the branch resumes babysitting, and the watcher then reports whatever arrived in the meantime.
+It exits when the PR leaves `OPEN`. When the harness stops it while the PR is still open, relaunch it. It dies with the session; running `/create-pr` again on the branch starts babysitting over from the top.
 
 ### On each wake
 
-The last stdout line is one JSON object. Its `pr` field is a snapshot of state, mergeability, review decision, and check counts. Act on `status`:
+A watch wake is a message headed `Update on pull request #<n>`. It can arrive about something the active loop already handled, because a wake that lands mid-turn queues behind it, so check before redoing work. Before patching, run `git pull --ff-only`, since someone else may have pushed during the watch. Then act on each item:
 
-| `status`           | Do                                                                                                   |
-| ------------------ | ---------------------------------------------------------------------------------------------------- |
-| `events`           | Handle `events` (below), run the active loop to handoff, then relaunch the watcher.                  |
-| `merged`           | Advance the Notion ticket (see On merge), then report that the PR merged. Babysitting is over.       |
-| `closed`           | Report that it closed without merging. Babysitting is over.                                          |
-| `already_watching` | A live watcher for this PR will wake you. Leave it running.                                          |
-| `error`            | `gh` kept failing, and `detail` holds the last error. Escalate: usually expired auth or lost access. |
-| `stopped`, or none | The watcher was killed. Relaunch it. Its state file keeps what was already reported.                 |
+| Item                                         | Do                                                                                                                                                   |
+| -------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Checks failed on `<sha>`                     | See CI failures. Each failed check carries its URL.                                                                                                  |
+| All required checks passed                   | Nothing to fix. When every piece of feedback is answered and the PR is mergeable, tell the user it's ready for them to merge.                        |
+| New comments                                 | Feedback: see Review feedback. Each carries its author and URL, but the body is cut to 200 characters, so fetch the full text and thread first. A review with no body shows as its state; `APPROVED` means nothing to fix. |
+| The branch now conflicts                     | See Mergeability.                                                                                                                                    |
+| Stopped watching after 10 comment-only updates | A bot is chatty. Handle the comments, then call `watch_pull_request` again.                                                                          |
+| Stopped watching, could not read the PR      | Escalate: usually expired `gh` auth or lost repository access.                                                                                       |
 
-Before patching, run `git pull --ff-only`, since someone else may have pushed during the watch. Each event carries `author` and `url`:
+After handling the items, run the active loop to handoff and end your turn.
 
-- `comment`, `review`, `thread_comment`: feedback, with `body` truncated. Fetch the full text or the surrounding thread through `url` or `gh api graphql` when it matters. A `thread_comment` carries the `thread_id` you reply to and resolve with. `edited: true` marks a comment the author changed after you may have handled it. Compare against what you did before redoing work.
-- `review` with `state: APPROVED`: nothing to fix. When CI is green and the PR is mergeable, tell the user it's ready for them to merge.
-- `check_failed`: a failure on the current head. See CI failures.
-- `conflict`: the PR has stopped merging cleanly with its base. See Mergeability.
-
-When a judgment call lands on the user, relaunch the watcher **before** you ask, so feedback keeps being collected while they decide.
+The merge waiter's output is the other wake. `MERGED`: run On merge, then report that the PR merged. `CLOSED`: report that it closed without merging. Either way, babysitting is over.
 
 ### On merge
 
