@@ -1,6 +1,6 @@
 # skills
 
-AI skills that I actually use
+AI skills that I actually use. Many skills contain workflows that rely on tools exposed only by T3 Code.
 
 ## Skills
 
