@@ -51,7 +51,7 @@ if (!Array.isArray(tickets) || tickets.length === 0) {
 }
 if (!rest.includes("--project-id") && !rest.includes("--no-project-id")) {
   console.error(
-    "pass --project-id <id> of the orchestrator's own project from t3_project_list, or --no-project-id to let launches inherit it",
+    "pass --project-id <id> of the target repo's project from t3_project_list, or --no-project-id to let launches inherit the orchestrator's project",
   )
   process.exit(2)
 }
@@ -61,7 +61,7 @@ const ledger = {
     pln,
     notion_url: arg("--url", null),
     repo: arg("--repo", "neiybor/rails-api"),
-    // Project for t3_thread_launch: the orchestrator's own, from t3_project_list.
+    // Target repo's project for t3_thread_launch, from t3_project_list.
     project_id: arg("--project-id", null),
     checkout: arg("--checkout", `${process.env.HOME}/neighbor/rails-api`),
     base_branch: arg("--base", "staging"),
