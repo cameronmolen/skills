@@ -17,7 +17,7 @@ Steps 1 through 5 run straight through, so the finished brief is the first thing
 ## 1. Load and link the PR
 
 ```sh
-gh pr view <PR> --json url,number,title,body,author,baseRefName,headRefOid,additions,deletions,changedFiles,files,reviews
+gh pr view <PR> --json url,number,title,body,author,baseRefName,headRefOid,additions,deletions,changedFiles,files,reviews,comments
 gh pr diff <PR>
 gh api user --jq .login
 ```
@@ -75,11 +75,15 @@ Check every decision, and the implementation detail behind it, for three kinds o
 - **Design**: an anti-pattern or smell whose cost shows up later, such as logic in the wrong layer, a leaky abstraction, a second source of truth, an API that is hard to evolve, or a migration with no backfill or rollback path. Name what gets harder, and for whom.
 - **Convention**: a departure from how this codebase already solves the same problem. Cite the existing example (`path:line`), because the finding rests on it.
 
+One more kind applies to the PR as a whole:
+
+- **Demo**: the diff changes frontend UI (components, styles, templates, or user-facing copy), and neither the PR description nor the author's comments attach a demo, such as a screenshot, a recording, or a video link. The consequence is that the reviewer has to judge the UI change without seeing it. The comment asks for a short recording or before-and-after screenshots, and it goes in the review `body` because it belongs to no single line.
+
 The bar: every finding names its **consequence**, meaning what breaks or what gets harder later. If you can't name a consequence, it's a nitpick, so drop it. Style, naming, and formatting that a linter or a later edit fixes cheaply fall below the bar.
 
 Before keeping a finding, re-read the code around it in the worktree, and confirm the trigger and the consequence hold. Check whether a test already covers it. A false finding costs the reviewer more than a missed nitpick. A finding already raised in another reviewer's open thread stays in the brief marked _already raised by @login_, and is left out of the comment options.
 
-Done when every decision from step 3 has been checked for all three kinds, and every finding you kept carries a location, a consequence, and evidence.
+Done when every decision from step 3 has been checked for all three kinds, the PR has been checked for a Demo finding, and every finding you kept carries a location, a consequence, and evidence.
 
 ## 5. Write the brief
 
