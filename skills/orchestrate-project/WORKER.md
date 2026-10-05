@@ -4,7 +4,7 @@
 
 `t3_thread_launch` creates one top-level thread and binds its workspace before the agent's first turn. Three arguments decide where and what it runs:
 
-- **`projectId`** names the project. Omitted, the worker inherits the caller's project, which is where it belongs (see below). Ids come from `t3_project_list`.
+- **`projectId`** names the target repo's project: the ledger's `project.project_id`. Omitted, the worker inherits the orchestrator's project, which is wrong whenever the orchestrator runs from elsewhere.
 - **`workspaceStrategy`** decides the checkout. Three shapes:
 
   | `type`              | Fields                                   | Effect                                                   |
@@ -17,17 +17,20 @@
 
 **Always pass `workspaceStrategy` explicitly.** Omitted, it means `root`: the project's main checkout, never the caller's worktree. Four workers sharing one working tree corrupts all four. So one worker is one call, with `baseRef` set to the branch below it in the stack. The full shape is in [The launch prompt](#the-launch-prompt).
 
-The launch needs a full-access or default-mode caller and has no retry key. It returns `threadId` once accepted, while the worktree may still be preparing. After an error or a lost response, find the thread with `t3_thread_list` (`titleContains: "<ENG-####>"`) before launching again, or you get two workers on one ticket.
+The launch needs a full-access or default-mode caller and has no retry key. It returns `threadId` once accepted, while the worktree may still be preparing. After an error or a lost response, find the thread with `t3_thread_list` (`projectId` from the ledger, `titleContains: "<ENG-####>"`) before launching again, or you get two workers on one ticket.
 
 The worker is in its own worktree on its own branch before its first turn. There is no handoff step, and `t3_worktree_handoff` is not part of this design.
 
 **Every worktree is a worktree of the one project clone, so they share a ref store and an object database.** That is what lets a worker branch off a sibling's branch that has never been pushed, and what lets `refs/stack-base/<branch>` be read from anywhere. It is also why branch names must stay unique across workers, which `branchFor` guarantees by keying on the ticket id.
 
-## Everything after launch is project-scoped
+## Reaching workers from any project
 
-`t3_thread_read`, `t3_thread_send`, `t3_thread_wait`, `t3_thread_interrupt`, and `t3_thread_list` resolve threads only inside the caller's project, even threads the caller launched. A worker launched into another project is one the orchestrator can never read or steer. So the orchestrator runs from a thread in the target project, and its workers inherit that project.
+`t3_thread_read`, `t3_thread_send`, `t3_thread_wait`, and `t3_thread_interrupt` resolve a `threadId` anywhere in the environment, and `t3_thread_list` lists the project its `projectId` names. So the orchestrator can run from any project, a hub thread included, and still drive workers in the target repo. Two limits hold:
 
-**The ledger is the index of your workers.** Record `thread_id` the moment `t3_thread_launch` returns, with `scripts/stack.mjs <PLN> push <ENG-####> --thread <id>`. The same call appends the ticket to the stack, so skipping it also leaves the next launch branching off a stale tip. `t3_thread_list` with `titleContains` can recover a lost id, but only because every worker's title starts with its ticket id.
+- **A worker can't run with broader permission modes than the orchestrator.** A send or interrupt aimed at one is rejected. Launches inherit the orchestrator's modes, so pass no `runtimeMode` or `interactionMode` wider than its own.
+- **The orchestrator writes to other threads only during a live run of its own.** Every tick and heartbeat is one, so relays and restacks go out from inside a turn.
+
+**The ledger is the index of your workers.** Record `thread_id` the moment `t3_thread_launch` returns, with `scripts/stack.mjs <PLN> push <ENG-####> --thread <id>`. The same call appends the ticket to the stack, so skipping it also leaves the next launch branching off a stale tip. `t3_thread_list` with the ledger's `projectId` and `titleContains` can recover a lost id, but only because every worker's title starts with its ticket id.
 
 `t3_thread_read` returns `thread.worktreePath` and `thread.branch`, so you can confirm a worker landed where you put it without asking it.
 

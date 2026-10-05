@@ -95,7 +95,7 @@ An operator request between ticks is not a phase. Relay it, then carry on.
 
    The default repo is `neiybor/rails-api`. Ask the operator when the project's tickets are tagged for another one.
 
-   Then confirm this thread runs in the target repo's T3 project: find the repo's entry in `t3_project_list` and check it matches the main workspace root `t3_worktree_status` reports. When it doesn't, stop and tell the operator to rerun from a thread in that project. Record the project's id for `bootstrap-ledger.mjs --project-id`.
+   Then find the target repo's T3 project in `t3_project_list`, matching its workspace root's `gh repo view --json nameWithOwner` to the repo, and record its id for `bootstrap-ledger.mjs --project-id`. The orchestrator itself can run from any project, within the limits in [`WORKER.md`](WORKER.md).
 
 2. Query the ticket graph and detect gates, following [`NOTION-GRAPH.md`](NOTION-GRAPH.md). That file carries the verified field traps, and the query is wrong without it.
 
@@ -168,7 +168,7 @@ Then delete any scheduled task via `list_scheduled_tasks` and `delete_scheduled_
 - **Merge the stack bottom-up, never out of order.** An entry merged from the middle strands a base for everything below it and squashes its parents' commits into `staging` twice. A green PR above the bottom is not an ask; `poll-prs.mjs` files it as `stack_green` rather than `ready_to_merge`.
 - **Every PR targets its `base_branch`, not the repo default.** `gh pr create` defaults to the default branch, so the worker passes `--base` explicitly. A PR silently opened against `staging` shows every parent's diff and cannot be reviewed.
 - **Shipped to prod is a grep for a distinctive symbol on `origin/master`.** Never SHA ancestry. `staging` is merged into `master`, so `git merge-base --is-ancestor` returns false for code that is live.
-- **Run the orchestrator from the target project, and launch every worker into it with `t3_thread_launch` and an explicit `workspaceStrategy`.** Workers in another project can't be read or steered, and workers without a `workspaceStrategy` share the main checkout. Both are in [`WORKER.md`](WORKER.md).
+- **Launch every worker with `t3_thread_launch`, the ledger's `projectId`, and an explicit `workspaceStrategy`.** Without the `projectId`, an orchestrator running from another project launches workers into the wrong repo; without the `workspaceStrategy`, they share the main checkout. Both are in [`WORKER.md`](WORKER.md).
 
 ## Polling
 

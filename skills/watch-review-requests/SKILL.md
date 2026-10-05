@@ -50,6 +50,6 @@ Running this skill is the user's request for one top-level thread per PR. Take t
 
    Pass `workspaceStrategy: {type: "root"}` explicitly with a project: `pr-brief` reads from the project's checkout and leaves its working tree untouched, so a fresh worktree per review would be wasted setup. A re-request launches a fresh thread too; `pr-brief` reads the user's earlier review from GitHub and briefs it as a re-review.
 
-3. **Keep each `threadId`.** `t3_thread_launch` has no retry key, so after an error or a lost response, look for the thread with `t3_thread_list` (`titleContains: "<repo>#<number>"`) before launching again. That listing only covers this thread's project, so a scratch or cross-project launch that may have landed is reported to the user rather than retried.
+3. **Keep each `threadId`.** `t3_thread_launch` has no retry key, so after an error or a lost response, look for the thread with `t3_thread_list` (`projectId` it launched into, `titleContains: "<repo>#<number>"`) before launching again. A scratch launch that may have landed is reported to the user rather than retried.
 
 Done when every PR in the wake has a launched thread. Report one line per PR, its title and thread, then end your turn; the relaunched watcher carries the queue from here.
