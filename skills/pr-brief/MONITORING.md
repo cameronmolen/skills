@@ -1,6 +1,6 @@
 # Monitoring the author's response
 
-`watch-response.py`, in this skill's folder, waits at no token cost for the PR's author to respond to the user's review, and exits when they do. Each exit **wakes** you. A wake is done when a new brief and recommendation are in front of the user.
+`watch-response.py`, in this skill's folder, waits at no token cost for the PR's author to respond to the user's review, and exits when they do. Each exit **wakes** you. A wake is done when a new brief and recommendation are in front of the user, or a new auto review is posted and the monitor relaunched.
 
 ## Launch
 
@@ -31,4 +31,4 @@ The last stdout line is one JSON object. Act on its `status`:
 
 Each event in `events` is `pushed`, `reply`, `resolved`, `comment`, or `re_requested`. `pr.my_threads` counts the user's threads that are open and resolved.
 
-Run `pr-brief` again from step 1 on this PR. It is a re-review, so the brief leads with what the author changed and which of the user's threads they addressed, followed by the recommendation. Where the author replied instead of changing the code, weigh the argument in their reply and say whether the finding still stands. Steps 6 through 8 run as usual, and step 8 decides whether monitoring goes on.
+Run `pr-brief` again from step 1 on this PR. It is a re-review: mechanical findings still standing go back to the author in another auto review (step 5), and once none stand, the brief leads with what the author changed and which of the user's threads they addressed, followed by the recommendation. Where the author replied instead of changing the code, weigh the argument in their reply and say whether the finding still stands. Steps 5 through 9 run as usual, and step 9 decides whether monitoring goes on.
