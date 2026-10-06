@@ -70,7 +70,6 @@ const ledger = {
     chain: [],
     stack: [],
     max_concurrency: Number(arg("--cap", MAX_CONCURRENCY)),
-    auto_launch: rest.includes("--auto-launch"),
     frozen_at: new Date().toISOString(),
   },
   tickets: {},
@@ -95,9 +94,8 @@ for (const t of tickets) {
     base_branch: null,
     stack_index: null,
     pr_base: null,
-    // An in-flight relayed operator request: {token, request, sent_at}. Cleared
-    // when the worker replies with the token.
-    relay: null,
+    // A planned restack waiting on the worker's RESTACKED. Set by stack.mjs restack.
+    restack: null,
     pr_number: t.pr_url
       ? Number(String(t.pr_url).match(/\/(\d+)\s*$/)?.[1]) || null
       : null,

@@ -14,7 +14,7 @@ WHERE "Project" LIKE '%<project-page-id-no-dashes>%'
 ORDER BY "Name"
 ```
 
-Frontier = `Blocked by` empty-or-all-`Done` AND `Status` in (`Ready`, `Inbound`).
+Frontier = `Blocked by` empty-or-all-`Done` AND `Status` in (`Blocked`, `Ready`, `Inbound`). A `Blocked` label whose blockers have cleared is stale, and the orchestrator moves it to `Ready`.
 
 `Status` values: `Blocked`, `Inbound`, `Ready`, `In progress`, `In review`, `In verification`, `Abandoned`, `Done`.
 
@@ -62,8 +62,4 @@ Its prose contradicts its own tables too. On PLN-3716 the `Sites` table is label
 
 ## Status writeback
 
-Writing `Status` and `PR(s)` back to Notion rides along on a tick a model is already awake for. Never give the poller a Notion token. It has no reason to hold one.
-
-Claiming is part of this. The moment a ticket launches, set `Status` to `In progress`, `Assignee` to `Cameron Molen`, and `Sprint` to the current active Host sprint, so the ticket stops looking available to a human browsing the board. See [`WORKER.md`](WORKER.md#claim-before-launch).
-
-Merge writeback is also part of reconciliation. For every ledger ticket whose orchestrator `status` is `merged` and whose `notion_status` is not `Done`, set the Notion `Status` to `Done`, fetch the ticket to verify it, then update `notion_status` in the ledger. Leave `notion_status` unchanged after a failed write so the next tick retries it.
+The orchestrator moves `Status` through the lifecycle in [`SKILL.md`](SKILL.md#notion-lifecycle), on a tick a model is already awake for. Never give the poller a Notion token. It has no reason to hold one.

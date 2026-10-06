@@ -28,7 +28,7 @@ The worker is in its own worktree on its own branch before its first turn. There
 `t3_thread_read`, `t3_thread_send`, `t3_thread_wait`, and `t3_thread_interrupt` resolve a `threadId` anywhere in the environment, and `t3_thread_list` lists the project its `projectId` names. So the orchestrator can run from any project, a hub thread included, and still drive workers in the target repo. Two limits hold:
 
 - **A worker can't run with broader permission modes than the orchestrator.** A send or interrupt aimed at one is rejected. Launches inherit the orchestrator's modes, so pass no `runtimeMode` or `interactionMode` wider than its own.
-- **The orchestrator writes to other threads only during a live run of its own.** Every tick and heartbeat is one, so relays and restacks go out from inside a turn.
+- **The orchestrator writes to other threads only during a live run of its own.** Every tick is one, so restacks go out from inside a turn.
 
 **The ledger is the index of your workers.** Record `thread_id` the moment `t3_thread_launch` returns, with `scripts/stack.mjs <PLN> push <ENG-####> --thread <id>`. The same call appends the ticket to the stack, so skipping it also leaves the next launch branching off a stale tip. `t3_thread_list` with the ledger's `projectId` and `titleContains` can recover a lost id, but only because every worker's title starts with its ticket id.
 
@@ -50,13 +50,13 @@ ntn datasources query 86133bd6-b63a-4993-9bfc-90f56c5a31c5 \
 
 Use the `Team`, `Start Date`, and `End Date` properties as the authority. Sprint names are inconsistent. If the query does not resolve to one active Host sprint, launch nothing and report the lookup as blocked.
 
-Immediately before each `t3_thread_launch`, use `notion-update-page` to set the ticket's `Status` to `In progress`, `Assignee` to `Cameron Molen`, and `Sprint` to that sprint. The `Sprint` relation value must be the sprint's full Notion page URL, not its UUID. Do this for every ticket you launch, not for the launchable list you merely report.
+Immediately before each `t3_thread_launch`, use `notion-update-page` to set the ticket's `Status` to `In progress`, `Assignee` to `Cameron Molen`, and `Sprint` to that sprint. The `Sprint` relation value must be the sprint's full Notion page URL, not its UUID. Claim only the tickets you are launching this tick; the rest of the launchable list stays at `Ready`.
 
-Fetch the ticket after the update and verify all three fields. Claim first, launch second. If the write or verification fails, do not launch the worker. Report the ticket as blocked on the claim instead of starting a worker Notion does not show as owned.
+Fetch the ticket after the update, verify all three fields, and set the ledger's `notion_status` to `In progress`. Claim first, launch second. If the write or verification fails, do not launch the worker. Report the ticket as blocked on the claim instead of starting a worker Notion does not show as owned.
 
 ## The launch prompt
 
-Run `scripts/stack.mjs <PLN> plan <ENG-####>` first. It returns `branch`, `base_branch`, and `start_from_origin` for this launch, computed against the current stack tip. Do not derive any of them yourself.
+Run `scripts/stack.mjs <PLN> plan <ENG-####>` first. It returns `branch`, `base_branch`, `start_from_origin`, `parent`, `parent_thread_id`, `floor`, and `repo` for this launch, computed against the current stack tip. Do not derive any of them yourself.
 
 ```
 t3_thread_launch({
@@ -71,15 +71,23 @@ t3_thread_launch({
 
 The moment `t3_thread_launch` returns, run `scripts/stack.mjs <PLN> push <ENG-####> --thread <thread-id>`. That appends the ticket to the stack, freezes its base, and sets `status` to `running`. **Until you run it the stack tip is stale, and the next launch will branch off the wrong ticket.**
 
+Fill `<below you>` with `<parent>, owned by worker thread <parent_thread_id>` when there is a parent, and with `the project's base` at the floor.
+
 ```
 You own <ENG-####>: <ticket name>
 Notion: <ticket url>
 
 You are already in your own git worktree on branch <branch>, based on <base_branch>.
-Do not create another worktree and do not switch branches.
+Stay in this worktree and on this branch.
 
-This branch is one link in a stacked PR chain. <base_branch> is the link below you
-and already contains the work you depend on. Treat it as read-only.
+This branch is one layer of a stacked PR chain on <repo>, merged bottom-up into
+<floor>. <base_branch> is the layer below you (<below you>). It already
+contains the work you depend on. Treat it as read-only.
+
+The operator talks to you directly in this thread. An orchestrator thread runs
+the stack and Notion; its only messages to you are restacks.
+
+## Implement
 
 - First, before you change anything, run:
     git update-ref refs/stack-base/<branch> HEAD
@@ -88,90 +96,81 @@ and already contains the work you depend on. Treat it as read-only.
 - Read the Notion ticket in full, including its acceptance criteria.
 - Implement it. Follow the repo's CLAUDE.md.
 - Lint changed files, then run the tests.
-- Stop after the implementation is complete and report what you changed, which
-  checks you ran, and any remaining concern. Do not create or push a PR yet.
+- Report to the operator what you changed, which checks you ran, and any
+  remaining concern. Then end your turn and wait for the operator. Ask them
+  instead of guessing when the ticket's approach is genuinely ambiguous.
 
-Do not rebase, merge, force-push, or create a PR on your own initiative. You will
-be sent an exact rebase command when the branch below you moves. You will receive
-a separate explicit instruction when the operator wants this ticket's PR opened.
+## Open the PR, when the operator asks
 
-YOUR FIRST TERMINAL STATE IS: implementation complete, changes reported, and no
-PR created. Reply with exactly this first line, followed by a concise report:
+Your PR stacks on the PR of the layer below you, so that layer opens first.
 
-READY_FOR_PR <branch>
-Changed: <what you changed>
-Checks: <lint and test results>
-Remaining: <"none" or the specific concern>
+1. Your base is <base_branch>, or the newer base a restack message has given you since.
+2. A base of <floor> is ready. Any other base, check its PR:
+     gh pr list --repo <repo> --head <base> --state all --json number,state,url
+   - OPEN: ready.
+   - MERGED: the orchestrator is about to restack you onto a new base. Wait
+     for its restack message, carry it out, then start this list again.
+   - No PR yet: tell the operator you are waiting on the layer below you to
+     open its PR. Run this with the Bash tool, run_in_background: true and the
+     longest timeout, then end your turn:
+       until [ -n "$(gh pr list --repo <repo> --head <base> --state all --json number --jq '.[0].number')" ]; do sleep 120; done
+     It exits once that PR exists; then start this list again. If the harness
+     stops it first, launch it again.
+3. Open your PR with the create-pr skill, titled "<ENG-####> <plain-language
+   summary>", passing the base explicitly:
+     gh pr create --base <base> --title "..." --body "..."
+4. On any base other than <floor>, link your PR onto the base's PR as a GitHub stack:
+     gh stack link --base <floor> <base PR number> <your PR number>
+   It adds your PR to the top of the stack the base PR is already in, or
+   starts one. If it errors, tell the operator and carry on; the PR still
+   targets the right base.
+5. Your PR shows only your own ticket's diff. Work from the layer below you
+   showing up in it means the base is wrong: stop and tell the operator,
+   leaving both branches as they are.
+6. Carry on with create-pr's babysitting. Merging is the operator's call.
 
-Then wait. Do not open a PR until an explicit message says to create it. After
-that instruction, open the PR with the create-pr skill, titled "<ENG-####>
-<plain-language summary>". Pass the base explicitly:
-  gh pr create --base <base_branch> --title "..." --body "..."
-Your PR must show only your own ticket's diff. If it shows work from the branch
-below you, the base is wrong. Stop and report instead of merging anything in.
-Push, and stay on the PR until CI is green. Do not merge. When that second phase
-is complete, reply with exactly: DONE <pr-url>
-Stop and report instead of guessing if the ticket's approach is genuinely ambiguous.
+## Restacks
+
+When the layer below you moves, the orchestrator sends you the exact commands.
+Run them as given, resolve conflicts in your own commits only, and reply with
+exactly one line:
+  RESTACKED <branch>                  once the force-push has landed
+  RESTACK_BLOCKED <branch>: <why>     when a conflict needs the operator
+Those are the rebases and force-pushes you make unprompted. Any other history
+change waits for the operator to ask for it.
 ```
 
 **`refs/stack-base/<branch>` is the whole restack mechanism.** A rebase needs the fork point, and once the parent branch has itself been rebased, `git merge-base` no longer finds it. The ref is written before the first commit and updated on every restack, so it always names the exact commit the branch was cut from. Worktrees share the one clone's ref store, so the orchestrator and every sibling worker can resolve it.
 
 **Only stack a ticket on top of its blockers.** A worker inherits exactly the branches beneath it, so a blocker that has not launched yet is not in its ancestry. `frontier.mjs` enforces this and reports the offenders as `held_blockers_not_stacked`. Never override it by launching out of order.
 
-## Relaying an operator request
-
-An operator request that lands on a live ticket's branch is a message to that ticket's worker. [`SKILL.md`](SKILL.md) has the rule; this is the message.
-
-```
-From the orchestrator, on <ENG-####>.
-
-<the request, narrowed to what this branch needs>
-
-Scope: your branch <branch> only. Leave every other branch alone, and rebase or
-force-push only when a message tells you to.
-When your PR is updated and CI is green again, reply: <TOKEN> <branch>
-```
-
-Two things make it land. **Narrow the request to the worker's branch** — the operator says "rename it everywhere", and each worker hears only its own files. Handed the whole request, and with a sibling's branch sitting in the same shared ref store, a worker will reach outside its own to satisfy it. And **write the ticket's `relay` field before sending** — `{token, request, sent_at}` — clearing it when the token comes back. Your context gets summarized; a relay you forget is a worker working on something nobody is waiting for.
-
 ## Restack on merge
 
 `staging` squashes. When the bottom of the stack merges, its commits land in `staging` as one new commit, and every branch above still carries the originals. Left alone, the next PR up shows its parent's diff again and conflicts on merge. So a merge rebases the entire column above it.
 
-Run `scripts/stack.mjs <PLN> restack <ENG-####>` for the merged ticket. It returns one entry per ticket above, bottom-to-top, each with:
+The poller queues the merge on `pending_restack`. `scripts/stack.mjs <PLN> restack <ENG-####>` plans the column and parks one entry on each ticket above it, as its `restack` field:
 
 - `command` — the exact rebase, ref update, and force-push, already filled in.
 - `retarget` — a `gh pr edit --base` when the base branch name changed. Only the entry directly above a merge gets one; the rest keep the same parent, whose history simply moved.
-- `base_was` and `base_now`, for the report.
+- `base_now` — the ticket's new base, which the worker needs for its PR.
 
-Send each entry to its `thread_id`:
+`frontier.mjs` lists the parked entries bottom-to-top as `restack_queue`. Send the bottom one to its `thread_id`:
 
 ```
-<merged branch> merged into staging. The branch below you moved, so restack:
+<merged branch> merged into <floor>. The branch below you moved, so restack.
+Your base is now <base_now>.
   <command>
 Then <retarget, when present>.
-Resolve any conflicts in your own commits only, and confirm CI goes green again.
-Reply RESTACKED <branch> when the force-push has landed.
 ```
 
-**Work the list strictly in order and wait for each `RESTACKED` before sending the next.** Entry N+1 rebases onto entry N's new tip. Send them together and N+1 rebases onto a branch that is about to move under it. Wait with `t3_thread_wait` on the worker's `thread_id`, with a bounded `timeoutMs`, then read its reply with `t3_thread_read` (`view: "messages"`, `afterPosition` from the ledger). A timeout leaves the worker running, so wait again rather than resending.
+**Work the queue strictly in order and wait for each reply before sending the next.** Entry N+1 rebases onto entry N's new tip. Send them together and N+1 rebases onto a branch that is about to move under it. Wait with `t3_thread_wait` on the worker's `thread_id`, with a bounded `timeoutMs`, then read its reply with `t3_thread_read` (`view: "messages"`, `afterPosition` from the ledger's `last_read_position`), and advance `last_read_position`. A timeout leaves the worker running, so wait again rather than resending.
 
-`stack.mjs restack` writes the new `base_branch` into the ledger as it plans, so the plan is not idempotent in the sense of being re-runnable per worker — but calling it with no ticket id is safe and returns exactly the entries whose ledger base and stack position still disagree. Use that to recover a half-finished cascade.
+On `RESTACKED`, run `stack.mjs <PLN> restacked <ENG-####>` and send the next. On `RESTACK_BLOCKED`, stop: the entry keeps its `restack`, everything above it waits behind it, and the worker has already put the conflict in front of the operator. Name it in the report.
+
+**A parked entry may already be in flight.** Before sending, read the worker's thread from `last_read_position`. A `RESTACKED` there means it landed while you were away: clear it and move on. Your own restack message there with no reply yet means it is still working: wait on it rather than resending.
 
 **Never run git in a live worker's worktree yourself.** The worker may be mid-edit, and you will race it. The only worktree you may touch directly is one whose thread is terminal.
 
-A worker that reports an unresolvable conflict during a restack is a human ask, not a zombie. Leave the branch as it is, and say in the report which entry the cascade stopped at — everything above it is stuck behind that one.
-
-## Zombies
-
-A stalled worker and a thinking worker look identical from outside. Both are just a thread that has not replied.
-
-1. **Staleness timeout.** No new timeline items for 45 minutes on a `running` ticket. Check with `t3_thread_read` using `afterPosition` from the ledger's `last_read_position`, so you read incrementally instead of re-reading the whole transcript.
-2. **Ping.** `t3_thread_send`: `Status check. What are you working on, and what is blocking you? Reply in two sentences.`
-3. **Escalate.** No reply within 15 minutes: mark `zombie` and put it in the report's human-ask list. Do not interrupt or restart it on your own. `t3_thread_interrupt` discards in-flight work, and that call belongs to the operator.
-
-A worker that replies asking a question is not a zombie. Relay its question to the operator verbatim and leave it `running`.
-
 ## Reading workers cheaply
 
-Never read a worker thread just to see whether it is alive. `poll-prs.mjs` answers that from GitHub for free. Read a thread only when it has gone stale, has asked a question, or its PR went red. Use `view: "messages"`, a `limit`, and `afterPosition` from the ledger. The default full-activity read is the single most expensive thing a tick can do.
+Read a worker's thread only to collect a restack reply. `poll-prs.mjs` answers everything else from GitHub for free. Use `view: "messages"`, a `limit`, and `afterPosition` from the ledger. The default full-activity read is the single most expensive thing a tick can do.
