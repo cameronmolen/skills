@@ -4,7 +4,14 @@
  *
  *   node frontier.mjs <PLN> [--table]
  */
-import { paths, readJson, frontier, baseBranchFor, stackView } from "./lib.mjs"
+import {
+  paths,
+  readJson,
+  frontier,
+  baseBranchFor,
+  stackView,
+  notionWrites,
+} from "./lib.mjs"
 
 const [pln, ...rest] = process.argv.slice(2)
 const ledger = readJson(paths(pln).ledger)
@@ -32,6 +39,10 @@ const out = {
   capacity: f.capacity,
   stack,
   merge_next: stack.find((s) => s.mergeable_now)?.id ?? null,
+  // Restacks waiting on a worker's RESTACKED, bottom-to-top. Work the first one.
+  restack_queue: stack.filter((s) => s.restack).map((s) => s.id),
+  pending_restack: ledger.project.pending_restack ?? [],
+  notion_writes: notionWrites(ledger),
   launch_now: ready,
   queued_behind_capacity: f.launchable.slice(f.capacity),
   held_blockers_not_stacked: f.held,
@@ -43,7 +54,6 @@ const out = {
   running: f.running,
   open: f.open,
   underway_elsewhere: f.underway_elsewhere,
-  zombie: f.zombie,
   merged: f.merged,
   blocked: f.blocked,
 }
@@ -64,7 +74,11 @@ if (rest.includes("--table")) {
   row("running", f.running.join(", ") || "-")
   row("underway elsewhere", f.underway_elsewhere.join(", ") || "-")
   row("open (awaiting merge)", f.open.join(", ") || "-")
-  row("zombie", f.zombie.join(", ") || "-")
+  row("restacking", out.restack_queue.join(", ") || "-")
+  row(
+    "notion writes due",
+    out.notion_writes.map((w) => `${w.id} -> ${w.to}`).join(", ") || "-",
+  )
   row("merged", f.merged.join(", ") || "-")
 } else {
   console.log(JSON.stringify(out, null, 2))

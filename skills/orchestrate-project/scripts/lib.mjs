@@ -14,7 +14,7 @@ export const paths = (pln) => {
     dag: join(r, "dag.json"),
     snapshot: join(r, "pr-snapshot.json"),
     events: join(r, "events.jsonl"),
-    wake: join(r, "WAKE"),
+    waiter: join(r, "waiter.json"),
   }
 }
 
@@ -60,7 +60,8 @@ export const orderKey = (name) => {
 }
 
 export const DONE = new Set(["Done", "Abandoned"])
-export const LAUNCHABLE_NOTION = new Set(["Ready", "Inbound"])
+/** Blocked counts: once its blockers are on the stack, the orchestrator moves it to Ready. */
+export const LAUNCHABLE_NOTION = new Set(["Ready", "Inbound", "Blocked"])
 /** A human picked this up outside the orchestrator. Never launch a second worker on it. */
 export const UNDERWAY_NOTION = new Set([
   "In progress",
@@ -161,17 +162,12 @@ export function frontier(ledger) {
     running: [],
     open: [],
     merged: [],
-    zombie: [],
     underway_elsewhere: [],
   }
 
   for (const [id, tk] of Object.entries(t)) {
     if (tk.status === "merged") {
       out.merged.push(id)
-      continue
-    }
-    if (tk.status === "zombie") {
-      out.zombie.push(id)
       continue
     }
     if (tk.status === "open") {
@@ -221,6 +217,46 @@ export function frontier(ledger) {
   return out
 }
 
+/** Notion's Status lifecycle. Blocked and Inbound share the floor; Abandoned sits outside it. */
+const NOTION_RANK = {
+  Blocked: 0,
+  Inbound: 0,
+  Ready: 1,
+  "In progress": 2,
+  "In review": 3,
+  "In verification": 4,
+  Done: 5,
+}
+
+/**
+ * The Notion Status writes the ledger calls for. Launchable means Ready, a worker
+ * means In progress, an open PR means In review, a merge means In verification.
+ * Done is a human's call. Forward only: a ticket a human already moved further
+ * along, or parked in Abandoned, stays where it is.
+ */
+export function notionWrites(ledger) {
+  const { launchable } = frontier(ledger)
+  const want = (id, tk) =>
+    tk.status === "merged"
+      ? "In verification"
+      : tk.status === "open"
+        ? "In review"
+        : tk.status === "running"
+          ? "In progress"
+          : launchable.includes(id)
+            ? "Ready"
+            : null
+  const out = []
+  for (const [id, tk] of Object.entries(ledger.tickets)) {
+    const to = want(id, tk)
+    const from = tk.notion_status
+    if (!to || !(from in NOTION_RANK)) continue
+    if (NOTION_RANK[to] > NOTION_RANK[from])
+      out.push({ id, notion_id: tk.notion_id, from, to })
+  }
+  return out
+}
+
 /** Bottom-to-top view of the live stack, for the report and for merge ordering. */
 export function stackView(ledger) {
   return liveStack(ledger).map((id, i) => {
@@ -234,6 +270,7 @@ export function stackView(ledger) {
       status: tk.status,
       pr_number: tk.pr_number,
       pr_base: tk.pr_base ?? null,
+      restack: tk.restack ?? null,
       mergeable_now: i === 0 && tk.status === "open",
     }
   })

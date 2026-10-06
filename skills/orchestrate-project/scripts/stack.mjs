@@ -7,10 +7,12 @@
  *   node stack.mjs <PLN> plan <ENG-####>
  *   node stack.mjs <PLN> push <ENG-####> --thread <thread-id> [--worktree <path>]
  *   node stack.mjs <PLN> restack [<ENG-####>]
+ *   node stack.mjs <PLN> restacked <ENG-####>
  *
  * `plan` is read-only and answers "what branch, off what base". `push` appends the
  * ticket to the stack and freezes that answer. `restack` is what you run after a
- * merge: it recomputes every base above the hole and prints the per-worker command.
+ * merge: it recomputes every base above the hole, prints the per-worker command,
+ * and parks each one on its ticket's `restack` field until `restacked` clears it.
  */
 import {
   paths,
@@ -26,7 +28,7 @@ import {
 
 const [pln, cmd, ...rest] = process.argv.slice(2)
 const usage =
-  "usage: stack.mjs <PLN> view|plan|push|restack [ENG-####] [--thread t] [--worktree p]"
+  "usage: stack.mjs <PLN> view|plan|push|restack|restacked [ENG-####] [--thread t] [--worktree p]"
 if (!pln || !cmd) {
   console.error(usage)
   process.exit(2)
@@ -39,6 +41,7 @@ if (!ledger) {
   process.exit(1)
 }
 ledger.project.stack ??= []
+ledger.project.pending_restack ??= []
 
 const arg = (flag) => {
   const i = rest.indexOf(flag)
@@ -75,7 +78,12 @@ const baseRef = (base) => {
 const out = (o) => console.log(JSON.stringify(o, null, 2))
 
 if (cmd === "view") {
-  out({ stack: stackView(ledger), floor: ledger.project.base_branch })
+  out({
+    stack: stackView(ledger),
+    floor: ledger.project.base_branch,
+    // Merges no restack has been planned for yet, oldest first.
+    pending_restack: ledger.project.pending_restack,
+  })
   process.exit(0)
 }
 
@@ -88,6 +96,9 @@ if (cmd === "plan") {
     base_branch: base,
     base_ref: baseRef(base),
     parent: stackParentId(ledger, id),
+    parent_thread_id: ledger.tickets[stackParentId(ledger, id)]?.thread_id ?? null,
+    floor: ledger.project.base_branch,
+    repo: ledger.project.repo,
     // Only the stack floor has a remote to start from. A parent branch may be local only.
     start_from_origin: base === ledger.project.base_branch,
     pr_base: base,
@@ -166,13 +177,32 @@ if (cmd === "restack") {
     }
   })
 
+  // Each step stays parked on its ticket until the worker confirms, so a cascade
+  // survives a summarized context or a dead session.
   for (const step of plan) {
-    ledger.tickets[step.id].base_branch = step.base_now
-    if (ledger.tickets[step.id].pr_number)
-      ledger.tickets[step.id].pr_base = step.base_now
+    const t = ledger.tickets[step.id]
+    t.base_branch = step.base_now
+    if (t.pr_number) t.pr_base = step.base_now
+    t.restack = {
+      after_merge_of: id,
+      base_now: step.base_now,
+      command: step.command,
+      retarget: step.retarget,
+    }
   }
+  ledger.project.pending_restack = ledger.project.pending_restack.filter(
+    (m) => m !== id,
+  )
   writeJson(p.ledger, ledger)
   out({ merged: id ?? null, restack_in_order: plan, stack: stackView(ledger) })
+  process.exit(0)
+}
+
+if (cmd === "restacked") {
+  const t = ledger.tickets[need(id)]
+  t.restack = null
+  writeJson(p.ledger, ledger)
+  out({ restacked: id, stack: stackView(ledger) })
   process.exit(0)
 }
 

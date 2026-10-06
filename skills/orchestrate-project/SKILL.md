@@ -1,36 +1,31 @@
 ---
 name: orchestrate-project
-description: Drive a Notion project's tickets to merged as one stacked PR chain. One worker thread per ticket, each branched off the one below it, polled and restacked as the bottom merges.
+description: Drive a Notion project's tickets to merged as one stacked PR chain, unattended once the operator approves the plan. One worker thread per ticket, each branched off the one below it; the orchestrator launches, restacks as the bottom merges, and moves each ticket's Notion status through its lifecycle.
 disable-model-invocation: true
-argument-hint: <notion-project-url> [bootstrap|tick|status|teardown] [--auto-launch]
+argument-hint: <notion-project-url> [bootstrap|tick|status|teardown]
 ---
 
 # Orchestrate project
 
-Run a Notion project's ticket graph to completion as a single stacked PR chain. Read the project's dependency DAG, launch one T3 worker thread per ticket on a branch cut from the branch below it, and keep the stack rebased as its bottom merges.
+Run a Notion project's ticket graph to completion as a single stacked PR chain. Read the project's dependency DAG, agree the plan with the operator, then launch one T3 worker thread per ticket on a branch cut from the branch below it, keep the stack rebased as its bottom merges, and keep Notion's `Status` in step, waking yourself as GitHub changes.
 
-**Arguments:** `$ARGUMENTS` is the Notion project URL, then an optional phase (default `tick`, or `bootstrap` when no ledger exists yet), then optional `--auto-launch`.
+**Arguments:** `$ARGUMENTS` is the Notion project URL, then an optional phase (default `tick`, or `bootstrap` when no ledger exists yet).
 
-## Division of labor
+## Who does what
 
-Two different terminal states. Confusing them wastes more work than any other mistake here.
+|                  | Owns                                                                     | Leaves to others                                   |
+| ---------------- | ------------------------------------------------------------------------ | -------------------------------------------------- |
+| **Orchestrator** | The queue: launches, restacks, Notion `Status`, the ledger               | Code, PRs, and every conversation after bootstrap  |
+| **Worker**       | One ticket's branch, its PR, and that PR's babysitting                   | Merging, and every other branch                    |
+| **Operator**     | Scope and gates at bootstrap; then each worker directly; every merge     |                                                    |
 
-|                   | Terminal state                                                | Never does                          |
-| ----------------- | ------------------------------------------------------------- | ----------------------------------- |
-| **Worker thread** | Implementation complete, report sent, waiting for PR approval | Merge or open a PR without approval |
-| **Orchestrator**  | Every ticket merged into `staging`                            | Write code                          |
+Bootstrap is where you get in step with the operator. After it you run **unattended**: wake on GitHub, act, re-arm, sleep. The operator talks to each worker in its own thread — "create a PR", review feedback, a rename — and never needs to answer you. Each tick ends with a short report in this thread, a log the operator reads when they choose. Something only a human can resolve, such as a restack conflict, already surfaces in that worker's thread; name it in the report and carry on with everything else.
 
-Merging is human-gated at Neighbor. PRs squash into `staging` on a person's click, so throughput is not yours to raise. Your job is queue management. Keep the frontier launched, keep the ledger true, and put what needs a human in front of the human in one legible list.
-
-## Relay operator requests
-
-Mid-run the operator will ask for things: rebase every branch, add a test to three tickets, rename a method everywhere. Each one is a relay to the workers that own the branches, not work for you. They hold the worktrees and the context; you hold the queue.
-
-Resolve the affected tickets from the ledger, then send one message per worker. Anything touching branch history goes bottom-to-top, one worker at a time, waiting for each to confirm — `scripts/stack.mjs` knows that order. Independent edits go out at once. **The relay is done when every worker has confirmed, not when the messages are sent.** [`WORKER.md`](WORKER.md) has the message shape.
+Merging is human-gated at Neighbor. PRs squash into `staging` on a person's click, so throughput is not yours to raise. Your job is queue management: keep the frontier launched, keep the ledger true, keep Notion honest.
 
 ## The stack
 
-Every worker's branch is cut from the branch below it, and every PR targets that branch rather than `staging`. The project ships as one stack, merged bottom-up.
+Every worker's branch is cut from the branch below it, and every PR targets that branch rather than `staging`. Workers link their PRs into a native GitHub stack with `gh stack link`, so reviewers see the chain. The project ships as one stack, merged bottom-up.
 
 ```
 staging  <-  ENG-1  <-  ENG-2  <-  ENG-3  <-  ENG-4
@@ -47,45 +42,57 @@ Three rules hold it together.
 
 `scripts/stack.mjs` owns all of this. Never hand-compute a base branch.
 
-| Command                                         | Does                                                                          |
-| ----------------------------------------------- | ----------------------------------------------------------------------------- |
-| `stack.mjs <PLN> view`                          | The stack bottom-to-top, and which entry is mergeable now                     |
-| `stack.mjs <PLN> plan <ENG-####>`               | The branch, base branch, and `startFromOrigin` for a launch. Read-only        |
-| `stack.mjs <PLN> push <ENG-####> --thread <id>` | Appends to the stack and freezes that base. Run right after `t3_thread_launch` |
-| `stack.mjs <PLN> restack [<ENG-####>]`          | The ordered rebase plan after a merge, one exact command per worker           |
+| Command                                         | Does                                                                            |
+| ----------------------------------------------- | ------------------------------------------------------------------------------- |
+| `stack.mjs <PLN> view`                          | The stack bottom-to-top, which entry is mergeable now, and `pending_restack`    |
+| `stack.mjs <PLN> plan <ENG-####>`               | The branch, base, parent, and `startFromOrigin` for a launch. Read-only         |
+| `stack.mjs <PLN> push <ENG-####> --thread <id>` | Appends to the stack and freezes that base. Run right after `t3_thread_launch`  |
+| `stack.mjs <PLN> restack <ENG-####>`            | Plans the rebase for every ticket above a merge and parks it on each ticket     |
+| `stack.mjs <PLN> restacked <ENG-####>`          | Clears a ticket's parked restack once its worker confirms                       |
 
-**The cost of a stack is that its bottom is a single point of blockage.** An unmerged PR at position 0 holds every PR above it. When the bottom stalls — CI red, changes requested, a gate — say so at the top of the report, because it is the one merge that unblocks the whole project.
+**The cost of a stack is that its bottom is a single point of blockage.** An unmerged PR at position 0 holds every PR above it. When the bottom stalls — CI red, changes requested, a gate — say so at the top of the report.
+
+## Notion lifecycle
+
+You own each launched ticket's `Status`, and it moves forward only:
+
+| Move                         | When                                                                  |
+| ---------------------------- | --------------------------------------------------------------------- |
+| `Blocked` → `Ready`          | It becomes launchable: every blocker merged or on the stack beneath it |
+| `Ready` → `In progress`      | You claim it, immediately before its launch                           |
+| `In progress` → `In review`  | Its PR opens                                                          |
+| `In review` → `In verification` | Its PR merges                                                      |
+
+`Done` is a human's call after verification. A ticket a human already moved further along, or parked in `Abandoned`, stays where it is.
+
+`frontier.mjs` computes the moves due as `notion_writes`. Apply each with `notion-update-page`, fetch the ticket to verify it, then set `notion_status` in the ledger. A failed write leaves `notion_status` untouched, so the next tick retries it. The claim also sets `Assignee` and `Sprint` — see [`WORKER.md`](WORKER.md#claim-before-launch). A worker's `create-pr` makes the `In review` and `In verification` moves too; because both sides only move forward, whichever lands first wins and the other finds nothing to do.
 
 ## The ledger
 
-Your context gets summarized and your session ends. The **ledger** is what survives. It lives at `~/.orchestrate-project/<PLN>/ledger.json`, alongside `dag.json` (the frozen graph), `pr-snapshot.json`, `events.jsonl`, and `WAKE`.
+Your context gets summarized and your session ends. The **ledger** is what survives. It lives at `~/.orchestrate-project/<PLN>/ledger.json`, alongside `dag.json` (the frozen graph), `pr-snapshot.json`, `events.jsonl`, and `waiter.json`.
 
 **Every phase starts by reading the ledger and ends by writing it.** Never reconstruct state from your own memory of earlier in the conversation.
 
-Per-ticket fields: `name`, `notion_id`, `status`, `notion_status`, `blocked_by[]`, `gate`, `thread_id`, `worktree_path`, `branch`, `base_branch`, `stack_index`, `pr_number`, `pr_base`, `relay`, `launched_at`, `last_checked`, `last_read_position`.
+Per-ticket fields: `name`, `notion_id`, `status`, `notion_status`, `blocked_by[]`, `gate`, `thread_id`, `worktree_path`, `branch`, `base_branch`, `stack_index`, `pr_number`, `pr_base`, `restack`, `launched_at`, `last_checked`, `last_read_position`.
 
-`relay` holds the request currently out with that worker — `{token, request, sent_at}` — and clears when the worker replies with the token. It is how a relay survives a summarized context.
+`restack` holds a planned rebase waiting on its worker — `{after_merge_of, base_now, command, retarget}` — and clears with `stack.mjs restacked`. It is how a cascade survives a summarized context or a dead session.
 
-Project-level fields include `project_id`, the target repo's T3 project id from `t3_project_list`, plus `chain` and `stack` from the section above.
-
-Write `thread_id` and `launched_at` the moment `t3_thread_launch` returns. Staleness is measured from `launched_at`, and every later read, ping, and relay addresses the worker by that id.
+Project-level fields include `project_id`, the target repo's T3 project id from `t3_project_list`; `chain` and `stack` from the section above; and `pending_restack`, the merges whose restack is not yet planned.
 
 `status` is orchestrator-owned and distinct from Notion's `Status`:
 
-`queued` → `gated` → `running` → `open` → `merged`, plus `zombie` and `abandoned`.
+`queued` → `gated` → `running` → `open` → `merged`, plus `abandoned`.
 
 `base_branch` is the branch this ticket was cut from and the base its PR targets. `pr_base` is what GitHub actually reports for the PR. They diverge whenever a restack has been planned but not yet carried out, and the poller raises `pr_base_drift` once they should have converged.
 
 ## Phases
 
-Route on the phase argument. Each phase is self-contained. Run one, report, stop.
+Route on the phase argument.
 
-An operator request between ticks is not a phase. Relay it, then carry on.
-
-- **`bootstrap`** builds the frozen DAG and ledger from Notion, confirmed with the operator. Read [`NOTION-GRAPH.md`](NOTION-GRAPH.md).
-- **`tick`** reconciles, restacks, launches, reports. Read [`WORKER.md`](WORKER.md).
+- **`bootstrap`** gets in step with the operator, builds the frozen DAG and ledger from Notion, and starts the run. Read [`NOTION-GRAPH.md`](NOTION-GRAPH.md).
+- **`tick`** reconciles, restacks, writes Notion, launches, and re-arms. You run it yourself on every wake; the operator runs it only to restart a run that died. Read [`WORKER.md`](WORKER.md).
 - **`status`** prints a read-only summary.
-- **`teardown`** reaps worktrees, compose stacks, the poller, and any scheduled task.
+- **`teardown`** reaps worktrees, compose stacks, the waiter, and the heartbeat.
 
 ---
 
@@ -105,57 +112,53 @@ An operator request between ticks is not a phase. Relay it, then carry on.
 
    The chain is the intended bottom-to-top order of the PR stack. Ties break toward the `5. ` ordering prefix in the ticket names, and gated tickets sort as late as topology allows, because a gate part-way up the stack stalls everything above it.
 
-5. Present the operator with `project.chain` as the proposed stack order, the frontier, the gated tickets and the evidence for each gate, every Mermaid divergence, and the concurrency cap. **Wait for explicit approval of the stack order before launching anything.** The order is frozen once the first worker launches, so this is the one cheap moment to change it.
+5. Present the operator with `project.chain` as the proposed stack order, the frontier, every Mermaid divergence, the concurrency cap, and each gated ticket with its evidence. **Ask for each gate's decision now.** This is the last conversation of the run; a gate left open stays unlaunched, along with everything that depends on it, until the operator comes back to this thread to settle it. **Wait for explicit approval of the stack order before launching anything.** The order is frozen once the first worker launches, so this is the one cheap moment to change it.
 
-Done when the operator has approved and `ledger.json` exists with every ticket assigned a `status`.
+6. Start the run. Schedule the heartbeat from [`POLLING.md`](POLLING.md), then run the tick, which launches the first workers and starts the waiter. Close by telling the operator the run is live and that from here they talk to the workers, each in its own thread.
+
+Done when the operator has approved, `ledger.json` assigns every ticket a `status`, the first workers are launched, the waiter is running, and the heartbeat is scheduled.
 
 ---
 
 ## Phase: tick
 
-Run all four steps in order, every tick. Read [`WORKER.md`](WORKER.md) for the launch contract, the restack move, and zombie handling.
+A tick starts on a wake — the waiter exiting, the heartbeat finding the waiter dead, or the operator restarting the run. Run all five steps in order, every tick. Read [`WORKER.md`](WORKER.md) for the launch contract and the restack move.
 
-1. **Reconcile.** Run `scripts/poll-prs.mjs <PLN>`. It updates PR state in the ledger and appends to `events.jsonl`. For every ledger ticket whose `status` is `merged` but whose `notion_status` is not `Done`, set the Notion ticket's `Status` to `Done`, verify the write, and update `notion_status` in the ledger. A failed write stays pending for the next tick and goes in the human-ask list. Then check each `running` worker for staleness.
+1. **Reconcile.** Run `scripts/poll-prs.mjs <PLN>` for one pass. It updates PR state in the ledger, marks merges, and queues each merge with live tickets above it on `pending_restack`.
 
-2. **Restack.** For each ticket that just merged, run `scripts/stack.mjs <PLN> restack <ENG-####>`. It returns one entry per ticket above the merge, bottom-to-top, each carrying the exact rebase command and, where the base name changed, the `gh pr edit --base` retarget.
+2. **Restack.** Run `scripts/frontier.mjs <PLN>`. For each id in `pending_restack`, oldest first, run `scripts/stack.mjs <PLN> restack <ENG-####>`, which parks a rebase on every ticket above the merge. Then rerun `frontier.mjs` and work `restack_queue` bottom-to-top, **one worker at a time**: send the parked command, wait for `RESTACKED`, run `stack.mjs <PLN> restacked <ENG-####>`, then move to the next. Each rebase moves the base the next one rebases onto, so sending them together races the whole column. A `RESTACK_BLOCKED` reply stops the cascade there; leave its `restack` in place and name it in the report. Every later tick resumes the queue from its bottom.
 
-   **Work that list strictly in order, one worker at a time.** Send entry N's commands to its thread and wait for it to confirm the force-push before sending entry N+1, because each rebase moves the base the next one rebases onto. Sending them at once races the whole column.
+   **Send the commands to the worker thread. Never touch a live worker's worktree yourself.** See [`WORKER.md`](WORKER.md#restack-on-merge).
 
-   **Send the commands to the worker thread. Never touch a live worker's worktree yourself.** See [`WORKER.md`](WORKER.md).
+3. **Notion.** Apply every `notion_writes` entry from `frontier.mjs`, per [Notion lifecycle](#notion-lifecycle).
 
-3. **Launch.** Run `scripts/frontier.mjs <PLN>` for the launchable set and remaining capacity, then branch on the launch mode.
-   - Default, operator-gated: list what is launchable and stop. Launch nothing.
-   - `--auto-launch`: launch up to the remaining capacity.
+4. **Launch.** From `frontier.mjs`, launch `launch_now` up to the remaining capacity, **in the order it returns**, one at a time: claim the ticket, call `t3_thread_launch`, then run `stack.mjs <PLN> push <ENG-####> --thread <id>` before the next. Each launch changes the stack tip, so the next ticket's base is not knowable until the one before it is recorded.
 
-   **Launch in the order `frontier.mjs` returns**, one at a time, and run `stack.mjs <PLN> push <ENG-####> --thread <id>` after each `t3_thread_launch` returns. Each launch changes the stack tip, so the next ticket's base is not knowable until the one before it is recorded. `frontier.mjs` reports only the first entry's base for that reason.
+   **Never launch a `gated` ticket.** A gate clears only when the operator names the ticket and states the decision. A gated ticket that sits below unlaunched work also caps the stack: nothing that depends on it can launch until the gate clears.
 
-   Either way, **never launch a `gated` ticket.** A gate clears only when the operator says so, by name. A gated ticket that sits below unlaunched work also caps the stack: nothing that depends on it can launch until the gate clears.
+5. **Re-arm and report.** Start the waiter per [`POLLING.md`](POLLING.md), unless one is already live. Then report in a few lines: the stack from `frontier.mjs <PLN> --table`, bottom-to-top, marking the entry mergeable now; what this tick changed; and anything stuck — a stalled bottom, a blocked restack, a failed Notion write, a gate. End the turn.
 
-   **Claim each ticket you actually launch.** Immediately before `t3_thread_launch`, set its Notion `Status` to `In progress`, `Assignee` to `Cameron Molen`, and `Sprint` to the current active Host sprint. Claim only tickets you are about to launch, never the whole launchable list. See [`WORKER.md`](WORKER.md).
+   When nothing is running, open, launchable, or restacking, the run is over: skip the waiter, delete the heartbeat, report what is merged and any gated tickets left, and suggest `teardown`.
 
-4. **Report.** Lead with the stack from `scripts/frontier.mjs <PLN> --table`, bottom-to-top, marking the entry that is mergeable now. Then one table: merged since last tick, open awaiting merge, running, launchable, held, gated, zombie, outstanding `relay`. Then the ask, naming the specific decisions and merges only a human can do.
-
-   **The bottom of the stack leads the ask.** Merging it is the single action that moves everything else, so name it first and say what it is waiting on.
-
-Done when the ledger is written, the report shows the stack in merge order, and it names every ticket that needs a human.
+Done when the ledger is written, `pending_restack` is empty, `restack_queue` is empty or stopped on a named `RESTACK_BLOCKED`, `notion_writes` is empty or each failure is reported, `launch_now` is launched up to capacity, and a waiter is live.
 
 ---
 
 ## Phase: status
 
-Read the ledger, run `scripts/frontier.mjs <PLN> --table`, print the same stack and table as `tick` step 4. No network calls, no writes, no launches.
+Read the ledger, run `scripts/frontier.mjs <PLN> --table`, and print it. No network calls, no writes, no launches.
 
 ---
 
 ## Phase: teardown
 
-Run `scripts/reap.sh <PLN>` to see the plan, then `scripts/reap.sh <PLN> --force` to execute. It removes the project's worktrees, tears down their compose stacks, deletes the `refs/stack-base/*` fork-point refs of terminal tickets, prunes the orphaned Docker networks, and unloads the launchd poller.
+Run `scripts/reap.sh <PLN>` to see the plan, then `scripts/reap.sh <PLN> --force` to execute. It removes the project's worktrees, tears down their compose stacks, deletes the `refs/stack-base/*` fork-point refs of terminal tickets, prunes the orphaned Docker networks, and kills the waiter.
 
 Reap only when the stack is empty. A live entry's worktree is skipped, but its `refs/stack-base` ref is what any remaining restack depends on, so tearing down mid-stack strands whatever is left above.
 
 **Teardown is not optional.** Deleting a worktree does not stop its compose stack, and abandoned stacks exhaust Docker's bridge-network pool of roughly 30 until every `make run-test` on the machine dies with `all predefined address pools have been fully subnetted`.
 
-Then delete any scheduled task via `list_scheduled_tasks` and `delete_scheduled_task`, and report which threads are still alive so the operator can close them.
+Then delete the heartbeat via `list_scheduled_tasks` and `delete_scheduled_task`, and report which threads are still alive so the operator can close them.
 
 ---
 
@@ -165,11 +168,11 @@ Then delete any scheduled task via `list_scheduled_tasks` and `delete_scheduled_
 - **One worktree per worker, and no cross-worker test lock.** `local-development/get-project-name.sh` derives the compose project name from the worktree's directory basename, so each worktree gets its own Postgres. Concurrent `make run-test` across worktrees is safe. What is not safe is two runs inside one worktree, and one worker owning one worktree makes that impossible by construction.
 - **Every change to a live ticket's branch is made by that ticket's worker.** Not by you, and not by a subagent of yours — `delegate_task` returns work to this thread, which owns no branch.
 - **Merged means `gh pr view <n> --json state,mergedAt` says so.** Nothing else counts as merged.
-- **Merge the stack bottom-up, never out of order.** An entry merged from the middle strands a base for everything below it and squashes its parents' commits into `staging` twice. A green PR above the bottom is not an ask; `poll-prs.mjs` files it as `stack_green` rather than `ready_to_merge`.
+- **Merge the stack bottom-up, never out of order.** An entry merged from the middle strands a base for everything below it and squashes its parents' commits into `staging` twice.
 - **Every PR targets its `base_branch`, not the repo default.** `gh pr create` defaults to the default branch, so the worker passes `--base` explicitly. A PR silently opened against `staging` shows every parent's diff and cannot be reviewed.
 - **Shipped to prod is a grep for a distinctive symbol on `origin/master`.** Never SHA ancestry. `staging` is merged into `master`, so `git merge-base --is-ancestor` returns false for code that is live.
 - **Launch every worker with `t3_thread_launch`, the ledger's `projectId`, and an explicit `workspaceStrategy`.** Without the `projectId`, an orchestrator running from another project launches workers into the wrong repo; without the `workspaceStrategy`, they share the main checkout. Both are in [`WORKER.md`](WORKER.md).
 
-## Polling
+## Waking
 
-Set the tick loop up once, during bootstrap. Read [`POLLING.md`](POLLING.md) for the launchd poller, the `schedule_task` fallback, and which to pick.
+You wake yourself: a background waiter wakes you when GitHub changes, and a heartbeat restarts the waiter when the session dies. Read [`POLLING.md`](POLLING.md) to arm either.

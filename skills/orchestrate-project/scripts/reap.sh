@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Reap a project's worktrees, compose stacks, and poller.
+# Reap a project's worktrees, compose stacks, and poll waiter.
 #
 #   ./reap.sh <PLN>           # dry run, prints exactly what it would do
 #   ./reap.sh <PLN> --force   # actually does it
@@ -58,13 +58,13 @@ echo "== stale networks =="
 run git -C "$CHECKOUT" worktree prune
 run docker network prune -f
 
-echo "== poller =="
-PLIST="$HOME/Library/LaunchAgents/com.neighbor.orchestrate-project.$PLN.plist"
-if [ -f "$PLIST" ]; then
-  run launchctl unload "$PLIST"
-  run rm "$PLIST"
+echo "== poll waiter =="
+WAITER="$HOME/.orchestrate-project/$PLN/waiter.json"
+PID="$( [ -f "$WAITER" ] && jq -r '.pid' "$WAITER" || true )"
+if [ -n "$PID" ] && ps -p "$PID" -o command= 2>/dev/null | grep -q "poll-prs.mjs $PLN"; then
+  run kill "$PID"
 else
-  echo "  no plist at $PLIST"
+  echo "  no live waiter"
 fi
 
 echo
