@@ -2,6 +2,14 @@
 
 AI skills that I actually use. Many skills contain workflows that rely on tools exposed only by T3 Code.
 
+## Install
+
+Install every skill globally:
+
+```sh
+npx skills add cameronmolen/skills -g --skill '*'
+```
+
 ## Skills
 
 <!-- skills-table:start -->
