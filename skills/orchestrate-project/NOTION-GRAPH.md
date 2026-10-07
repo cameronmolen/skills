@@ -56,7 +56,7 @@ The `## Ticket Dependency Graph` block on the project page goes stale, and it di
 - It omits real edges. PLN-3716's Mermaid shows no ticket-to-ticket edges at all, while ticket 5 has two genuine (Done) blockers.
 - It adds information the relation cannot hold. The `D5` decision node is the project's real gate.
 
-Its prose contradicts its own tables too. On PLN-3716 the `Sites` table is labelled "verified against the code" while carrying a row for a callback that no longer exists.
+Its prose contradicts its own tables too. On PLN-3716 the `Sites` table is labeled "verified against the code" while carrying a row for a callback that no longer exists.
 
 **Diff it against `Blocked by`, report every divergence, and reconcile nothing silently.** The divergence is usually the most useful thing bootstrap produces.
 

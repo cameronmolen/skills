@@ -179,7 +179,7 @@ A logic diff at the right grain:
 ```diff
  on cancel(reservation)
 -  refund in full
-+  if cancelled within 24h of start
++  if canceled within 24h of start
 +    refund 50%
 +  else
 +    refund in full

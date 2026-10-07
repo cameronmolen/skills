@@ -170,7 +170,7 @@ def main() -> int:
     pid_path = state_path.with_suffix(".pid")
 
     if args.done:
-        # Drop the state before signalling, so the watcher reports "done" rather than "stopped".
+        # Drop the state before signaling, so the watcher reports "done" rather than "stopped".
         state_path.unlink(missing_ok=True)
         if pid := live_pid(pid_path):
             os.kill(pid, signal.SIGTERM)
