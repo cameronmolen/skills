@@ -121,20 +121,20 @@ if (missing.length) {
   process.exit(2)
 }
 
-// Cycle check (DFS with colours).
-const colour = {}
+// Cycle check (DFS with colors).
+const color = {}
 const stack = []
 const walk = (id) => {
-  if (colour[id] === 2) return
-  if (colour[id] === 1) {
+  if (color[id] === 2) return
+  if (color[id] === 1) {
     console.error(`cycle: ${[...stack, id].join(" -> ")}`)
     process.exit(2)
   }
-  colour[id] = 1
+  color[id] = 1
   stack.push(id)
   for (const b of ledger.tickets[id].blocked_by) walk(b)
   stack.pop()
-  colour[id] = 2
+  color[id] = 2
 }
 for (const id of Object.keys(ledger.tickets)) walk(id)
 
