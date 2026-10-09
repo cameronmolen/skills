@@ -51,7 +51,7 @@ export const slug = (name) =>
     .join("-")
 
 export const branchFor = (id, name) =>
-  `t3code/${id.toLowerCase()}-${slug(name)}`
+  `${id.toLowerCase()}-${slug(name)}`
 
 /** The "5. " prefix Notion ticket names carry is the operator's intended order. */
 export const orderKey = (name) => {

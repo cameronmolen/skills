@@ -27,7 +27,7 @@ import {
 const [pln, ...rest] = process.argv.slice(2)
 if (!pln) {
   console.error(
-    "usage: bootstrap-ledger.mjs <PLN> [--repo r] [--checkout p] [--base b] [--force] < tickets.json",
+    "usage: bootstrap-ledger.mjs <PLN> [--name n] [--repo r] [--checkout p] [--base b] [--force] < tickets.json",
   )
   process.exit(2)
 }
@@ -59,6 +59,8 @@ if (!rest.includes("--project-id") && !rest.includes("--no-project-id")) {
 const ledger = {
   project: {
     pln,
+    // The Notion project page's title, for the orchestrator's thread title.
+    name: arg("--name", null),
     notion_url: arg("--url", null),
     repo: arg("--repo", "neiybor/rails-api"),
     // Target repo's project for t3_thread_launch, from t3_project_list.

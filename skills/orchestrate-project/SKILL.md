@@ -77,7 +77,7 @@ Per-ticket fields: `name`, `notion_id`, `status`, `notion_status`, `blocked_by[]
 
 `restack` holds a planned rebase waiting on its worker — `{after_merge_of, base_now, command, retarget}` — and clears with `stack.mjs restacked`. It is how a cascade survives a summarized context or a dead session.
 
-Project-level fields include `project_id`, the target repo's T3 project id from `t3_project_list`; `chain` and `stack` from the section above; and `pending_restack`, the merges whose restack is not yet planned.
+Project-level fields include `name`, the Notion project's title; `project_id`, the target repo's T3 project id from `t3_project_list`; `chain` and `stack` from the section above; and `pending_restack`, the merges whose restack is not yet planned.
 
 `status` is orchestrator-owned and distinct from Notion's `Status`:
 
@@ -86,6 +86,14 @@ Project-level fields include `project_id`, the target repo's T3 project id from 
 `base_branch` is the branch this ticket was cut from and the base its PR targets. `pr_base` is what GitHub actually reports for the PR. They diverge whenever a restack has been planned but not yet carried out, and the poller raises `pr_base_drift` once they should have converged.
 
 ## Phases
+
+When the operator invokes this skill, whatever the phase, first rename this thread so it reads as the orchestrator in the thread list:
+
+```
+t3_thread_update({action: "rename", title: "[ORC] <project name>"})
+```
+
+The project name is the Notion project page's title. `bootstrap` reads it in step 1; every other phase reads `project.name` from the ledger, or fetches the page when a ledger from before this field has no `name`. Ticks you run on your own wakes skip the rename, because the title is already set.
 
 Route on the phase argument.
 
@@ -98,7 +106,7 @@ Route on the phase argument.
 
 ## Phase: bootstrap
 
-1. Resolve the project URL to its `PLN-####` and page id. Refuse to proceed if `~/.orchestrate-project/<PLN>/ledger.json` already exists. Say so and suggest `tick` instead.
+1. Resolve the project URL to its `PLN-####`, page id, and title, and rename this thread `[ORC] <title>`. Refuse to proceed if `~/.orchestrate-project/<PLN>/ledger.json` already exists. Say so and suggest `tick` instead.
 
    The default repo is `neiybor/rails-api`. Ask the operator when the project's tickets are tagged for another one.
 
@@ -108,7 +116,7 @@ Route on the phase argument.
 
 3. Diff `Blocked by` against the project page's Mermaid "Ticket Dependency Graph". They routinely disagree in both directions. **Report every divergence to the operator and reconcile nothing on your own.** The Mermaid often encodes a human gate the relation cannot express, which is signal rather than noise.
 
-4. Pipe the ticket array to `scripts/bootstrap-ledger.mjs`. It mints branch names, rejects cycles, topologically sorts the DAG into `project.chain`, opens an empty `project.stack`, and writes `ledger.json` and `dag.json`.
+4. Pipe the ticket array to `scripts/bootstrap-ledger.mjs`, passing the project's title as `--name`. It mints branch names, rejects cycles, topologically sorts the DAG into `project.chain`, opens an empty `project.stack`, and writes `ledger.json` and `dag.json`.
 
    The chain is the intended bottom-to-top order of the PR stack. Ties break toward the `5. ` ordering prefix in the ticket names, and gated tickets sort as late as topology allows, because a gate part-way up the stack stalls everything above it.
 
