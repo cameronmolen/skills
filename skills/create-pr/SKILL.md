@@ -191,21 +191,23 @@ function expandSkill(command: string): string {
 
 #### Other Description Sections
 
-- `## Demo` belongs to frontend-facing changes only; leave its TODO line in place for the author's screenshots. Backend, infra, docs, and test-only PRs drop the section.
+- `## Demo` belongs to frontend-facing changes only; backend, infra, docs, and test-only PRs drop the section. Screenshots and videos you recorded while verifying the change become the demo: replace the TODO line with one `![<what it shows>](<path>)` per file, each path also passed to `--attach` (see Command). With nothing recorded, leave the TODO line in place for the author's screenshots.
 - `**Related Notion ticket:**` takes the ticket URL, found from the URL given, the `ENG-xxx` ID, the branch name, commit messages, or task context. `N/A` goes in only once all of those come up empty. Hold onto the page ID — step 6 and BABYSITTING.md's On merge write back to it.
 - The collapsible section carries the design decisions reviewers need (product, architecture, data model, API, UI, testing, migration, compatibility) and the acceptance criteria that shaped the work — this is where the technical specifics belong. Trivial PRs — copy changes, one-line fixes, dependency bumps, mechanical cleanup — drop the section.
 
 ### Command
 
 ```
-gh pr create --title "<title>" --body "<description>"
+gh pr create --title "<title>" --body "<description>" --attach <path> --attach <path>
 ```
 
-When the PR already exists, `gh pr view --json url,state,number,headRefName,baseRefName` names the target instead.
+One `--attach` per demo file; drop the flag when there are none. gh uploads each file and rewrites the body reference with the matching path to point at the uploaded asset. When some uploads fail, gh still creates the PR, prints its URL, and exits non-zero: take the URL, report the files that failed, and carry on.
+
+When the PR already exists, `gh pr view --json url,state,number,headRefName,baseRefName` names the target instead; attach demo files recorded since with `gh pr edit <PR> --attach <path>`, which appends them to the existing body.
 
 Link the PR to this thread with `link_pull_request` as soon as you hold its URL, so T3 Code shows its status beside the thread.
 
-Done when you hold a linked PR URL and every placeholder comment in the body has resolved to real content or `N/A`.
+Done when you hold a linked PR URL, every placeholder comment in the body has resolved to real content or `N/A`, and every recorded demo file shows in the body as an uploaded asset.
 
 ## 6. Append the PR to the Notion ticket
 
