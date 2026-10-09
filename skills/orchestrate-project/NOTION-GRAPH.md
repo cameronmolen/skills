@@ -34,7 +34,7 @@ Five of these will silently produce a wrong graph.
 
 **`Create Branch` is unreadable, so do not plan around it.** It sits in the data source's `notAvailableInQuerySql`, `notion-fetch` returns an opaque `formulaResult://…` handle rather than a value, and fetching its `formulaCode://` URL is rejected by the API with `URL type formulaCode not currently supported`. The same holds for `Blocked By Open Ticket`, `StatusFormula`, and `Needs Attention`. Every formula column on this database is opaque to every tool available.
 
-So the orchestrator mints the branch name and records it in the ledger. That minted name is the branch-to-ticket join key, and it is the only one that exists. `scripts/bootstrap-ledger.mjs` mints `t3code/eng-<id>-<slug>`, matching the convention already in use under `~/.t3/worktrees/rails-api/`.
+So the orchestrator mints the branch name and records it in the ledger. That minted name is the branch-to-ticket join key, and it is the only one that exists. `scripts/bootstrap-ledger.mjs` mints `eng-<id>-<slug>`, matching the convention already in use under `~/.t3/worktrees/rails-api/`.
 
 ## Gates
 
