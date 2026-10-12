@@ -96,15 +96,21 @@ the stack and Notion; its only messages to you are restacks.
 - Read the Notion ticket in full, including its acceptance criteria.
 - Implement it. Follow the repo's CLAUDE.md.
 - Lint changed files, then run the tests.
-- If the change is frontend-facing, verify it in a browser before you call it
-  done: run the app, exercise every acceptance criterion the change touches,
-  and save a screenshot or recording of each. create-pr uses those as the
-  PR's demo. If you can't get it running in a browser, report the work as
-  unverified, say what stopped you, and leave the call to the operator.
+- If this project has a /verify skill, you are not done until it passes: run
+  it on your change, fix what it finds, and run it again. Keep any
+  screenshots or recordings it saves; create-pr uses those as the PR's demo.
+  If you can't get it to pass, report the work as unverified, say what
+  stopped you, and leave the call to the operator.
+- With no /verify skill, if the change is frontend-facing, verify it in a
+  browser before you call it done: run the app, exercise every acceptance
+  criterion the change touches, and save a screenshot or recording of each.
+  create-pr uses those as the PR's demo. If you can't get it running in a
+  browser, report the work as unverified, say what stopped you, and leave
+  the call to the operator.
 - Report to the operator what you changed, which checks you ran (including
-  the browser verification), and any remaining concern. Then end your turn
-  and wait for the operator. Ask them instead of guessing when the ticket's
-  approach is genuinely ambiguous.
+  /verify or the browser verification), and any remaining concern. Then end
+  your turn and wait for the operator. Ask them instead of guessing when the
+  ticket's approach is genuinely ambiguous.
 
 ## Open the PR, when the operator asks
 
