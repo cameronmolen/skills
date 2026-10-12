@@ -1,8 +1,8 @@
 ---
 name: pr-brief
-description: Brief a pull request for its human reviewer. Requests changes on bugs, coding-standards breaks, and missing demos without asking, then shows the API, data, and logic decisions the PR makes, flags design problems, recommends a verdict, posts the comments the user picks, and re-briefs once the author responds. Use when the user wants to understand or review someone else's PR.
+description: Brief a pull request for its human reviewer. Requests changes on bugs, coding-standards breaks, and missing demos without asking, then shows the API, data, and logic decisions the PR makes, flags design problems, writes a review guide for high-risk PRs, recommends a verdict, posts the comments the user picks, and re-briefs once the author responds. Use when the user wants to understand or review someone else's PR.
 argument-hint: <PR URL or number>
-allowed-tools: Bash, Read, Glob, Grep, AskUserQuestion
+allowed-tools: Bash, Read, Glob, Grep, AskUserQuestion, mcp__t3-code__write_pull_request_guides, mcp__t3-code__read_pull_request_guide
 ---
 
 A **brief** lets the reviewer decide a PR's future without reading its code. It is built from two things:
@@ -75,7 +75,9 @@ Then rate the PR's **merge danger**, meaning what it costs if the merge turns ou
 - **Blast radius**: everything the merge could affect if it's wrong. Consider every surface the change reaches, beyond the code it touches, such as layout shift, breakages for consumers, and mobile responsiveness. The dependents you found for each decision are the starting point.
 - **Deploy order**: another PR or deploy that has to land first.
 
-Done when every changed file is accounted for, either inside a named decision or as implementation detail, and the merge danger names its door, every surface in its blast radius, and any deploy order.
+Then call the PR **high risk** or not. High risk means a wrong call at review is expensive to undo, so the reviewer needs to walk the change itself, beyond the brief. A PR is high risk when it is a one-way door, reshapes the architecture (a new module boundary, dependency direction, service, or pattern the rest of the codebase will follow), changes a contract that clients or other services consume, touches money, auth, or data integrity, or needs a deploy order. Judge it from the decisions and the merge danger alone: size says nothing about risk, so a ten-line migration can be high risk and a thousand-line UI refactor can be low.
+
+Done when every changed file is accounted for, either inside a named decision or as implementation detail, the merge danger names its door, every surface in its blast radius, and any deploy order, and the high-risk call names the reason that makes it so, or none.
 
 ## 4. Hunt findings
 
@@ -113,6 +115,8 @@ Tell the user in one line what you asked for and link the review, for example "R
 
 ## 6. Write the brief
 
+When the PR is high risk, start its **review guide** first, so it writes while you write the brief: a T3 Code walkthrough the user reads in the PR's Guide tab. On a re-review, call `read_pull_request_guide` and start one only when no guide exists or it is `stale`. Start it with `write_pull_request_guides({pullRequests: [{url: "<PR URL>"}]})`; it returns once the run is under way. When the tool is unavailable or the call fails (guides off, or no T3 project has the PR's repo), carry on with the brief and give the reason on its guide line.
+
 The user reads the brief instead of the code. Every sentence should carry a decision, a consequence, or a verdict, so cut anything else. Link every location to the head commit (`https://github.com/<owner>/<repo>/blob/<headRefOid>/<path>#L<line>`) so the user can jump to the code when they need to.
 
 ```md
@@ -140,12 +144,14 @@ The user reads the brief instead of the code. Every sentence should carry a deci
 
 **<One-way | Two-way> door** · <blast-radius surfaces, a few words each>. <Deploy order, or what a revert can't undo, when either applies.>
 
+**High risk** · <the reason>. Review guide: <writing in the PR's Guide tab | not written: reason>. <!-- high-risk PRs only -->
+
 ### Findings
 
 1. **Design** · [`path:line`](link): <problem>, so <consequence>. _Fix:_ <smallest change that resolves it>.
 ```
 
-Order the decisions most consequential first. Merge danger stays within two lines.
+Order the decisions most consequential first. Merge danger stays within two lines, plus the high-risk line when it applies.
 
 With no findings, the Findings section reads `None.` Recommend **Request changes** when a disputed mechanical finding, or a Design finding that shouldn't merge as-is, stands. Recommend **Comment** when the verdict hinges on something only the author can answer. Recommend **Approve** otherwise, including when the only findings are worth mentioning but not worth blocking on.
 
