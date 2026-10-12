@@ -1,12 +1,12 @@
 ---
 name: watch-review-requests
-description: Watch GitHub for PRs requesting your review and launch a T3 Code thread that briefs each one with pr-brief.
+description: Watch GitHub for PRs requesting your review and launch a T3 Code thread that writes each one's review guide.
 disable-model-invocation: true
 argument-hint: "[extra search qualifiers, e.g. org:neiybor]"
 allowed-tools: Bash, Read, AskUserQuestion, mcp__t3-code__t3_project_list, mcp__t3-code__t3_thread_launch, mcp__t3-code__t3_thread_list
 ---
 
-`watch-review-requests.py`, in this skill's folder, waits on the user's **review queue** at no token cost: open PRs that are not drafts, not approved, and request a review from the user's account directly. It exits when a PR enters the queue, and each exit **wakes** you. Each PR it reports gets its own top-level T3 Code thread running `pr-brief`, so this thread stays a lightweight dispatcher and every brief keeps its questions and follow-ups in its own conversation. A wake is done when every PR it reported has a launched thread and the watcher is running again.
+`watch-review-requests.py`, in this skill's folder, waits on the user's **review queue** at no token cost: open PRs that are not drafts, not approved, and request a review from the user's account directly. It exits when a PR enters the queue, and each exit **wakes** you. Each PR it reports gets its own top-level T3 Code thread that writes the PR's review guide with `write_pull_request_guides`, so this thread stays a lightweight dispatcher and every review keeps its questions and follow-ups in its own conversation. A wake is done when every PR it reported has a launched thread, or has been reported as needing a project, and the watcher is running again.
 
 Arguments: `$ARGUMENTS` are extra GitHub search qualifiers. Pass them through as `--filter` on every launch.
 
@@ -37,19 +37,19 @@ The last stdout line is one JSON object. Act on its `status`:
 
 Running this skill is the user's request for one top-level thread per PR. Take the PRs in `prs` oldest `requested_at` first.
 
-1. **Map each PR's `repo` to a T3 project.** Call `t3_project_list` (page through `cursor`) once per wake, and for each project read its repo with `gh repo view --json nameWithOwner --jq .nameWithOwner`, run in the project's workspace root. A PR whose `repo` matches a project launches into it, where `pr-brief` uses that checkout as its base clone and builds its review worktree beside it. A PR with no matching project launches as `scratch`, and `pr-brief` clones the repo into its cache.
+1. **Map each PR's `repo` to a T3 project.** Call `t3_project_list` (page through `cursor`) once per wake, and for each project read its repo with `gh repo view --json nameWithOwner --jq .nameWithOwner`, run in the project's workspace root. A PR whose `repo` matches a project launches into it. `write_pull_request_guides` reads each PR through the project whose checkout has that repository, so a PR with no matching project gets no thread: report it to the user as needing its repo added as a T3 project.
 2. **Launch one thread per PR** with `t3_thread_launch`, inheriting this thread's model and modes:
 
    ```
    t3_thread_launch({
      title: "[REV] <title>",
-     projectId: "<matching project id>", workspaceStrategy: {type: "root"},  // or scratch: true
-     message: "Use the pr-brief skill to brief <url>."
+     projectId: "<matching project id>", workspaceStrategy: {type: "root"},
+     message: "Call the write_pull_request_guides tool for <url>."
    })
    ```
 
-   Pass `workspaceStrategy: {type: "root"}` explicitly with a project: `pr-brief` reads from the project's checkout and leaves its working tree untouched, so a fresh worktree per review would be wasted setup. A re-request launches a fresh thread too; `pr-brief` reads the user's earlier review from GitHub and briefs it as a re-review.
+   Pass `workspaceStrategy: {type: "root"}` explicitly: the guide is written in its own temporary checkout, so a fresh worktree per review would be wasted setup. A re-request launches a fresh thread too, and the guide is written again for the new head.
 
-3. **Keep each `threadId`.** `t3_thread_launch` has no retry key, so after an error or a lost response, look for the thread with `t3_thread_list` (`projectId` it launched into, `titleContains: "[REV] <title>"`) before launching again. A scratch launch that may have landed is reported to the user rather than retried.
+3. **Keep each `threadId`.** `t3_thread_launch` has no retry key, so after an error or a lost response, look for the thread with `t3_thread_list` (`projectId` it launched into, `titleContains: "[REV] <title>"`) before launching again.
 
-Done when every PR in the wake has a launched thread. Report one line per PR, its title and thread, then end your turn; the relaunched watcher carries the queue from here.
+Done when every PR in the wake has a launched thread or has been reported as needing a project. Report one line per PR, its title and thread, then end your turn; the relaunched watcher carries the queue from here.
