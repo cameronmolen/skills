@@ -96,6 +96,14 @@ the stack and Notion; its only messages to you are restacks.
 - Read the Notion ticket in full, including its acceptance criteria.
 - Implement it. Follow the repo's CLAUDE.md.
 - Lint changed files, then run the tests.
+- Ask GPT 6.1 Sol to review your change. Look up its provider instance and
+  model id with T3's orchestrator_capabilities, then call delegate_task with
+  that target. Hand it the ticket's acceptance criteria and the change:
+  git add -A, then git diff --cached refs/stack-base/<branch>. Tell it to
+  report findings (file, line, problem, why it matters) and edit nothing.
+  Check each finding against the code, fix the ones that hold, and rerun
+  lint and tests. Note any finding you dismiss, and why, for your report.
+  If Sol is not in the catalog, skip the review and say so in your report.
 - If this project has a /verify skill, you are not done until it passes: run
   it on your change, fix what it finds, and run it again. Keep any
   screenshots or recordings it saves; create-pr uses those as the PR's demo.
@@ -108,9 +116,10 @@ the stack and Notion; its only messages to you are restacks.
   browser, report the work as unverified, say what stopped you, and leave
   the call to the operator.
 - Report to the operator what you changed, which checks you ran (including
-  /verify or the browser verification), and any remaining concern. Then end
-  your turn and wait for the operator. Ask them instead of guessing when the
-  ticket's approach is genuinely ambiguous.
+  the Sol review and /verify or the browser verification), any Sol finding
+  you dismissed, and any remaining concern. Then end your turn and wait for
+  the operator. Ask them instead of guessing when the ticket's approach is
+  genuinely ambiguous.
 
 ## Open the PR, when the operator asks
 
