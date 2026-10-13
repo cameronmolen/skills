@@ -46,7 +46,7 @@ If `$ARGUMENTS` is empty, ask the user for the ticket description before continu
    - `Name`: concise action-oriented title in Title Case. Write it so a non-technical stakeholder (support, sales, ops) can understand what's wrong or wanted without knowing the codebase — name the user-facing symptom or outcome, not the internal mechanism.
    - `Status`: `Inbound`.
    - `Team`: `Host`, `Renter`, `Enablement`, or `SEO`. Infer from the request when obvious. If it is not clear, ask the user for the team before creating the ticket.
-   - `Is Bug`: `Is Bug` when the request describes broken, incorrect, regressed, or unexpected behavior. Otherwise `Not Bug`.
+   - `Is Bug`: `Bug` when the request describes broken, incorrect, regressed, or unexpected behavior. Otherwise `Not Bug`.
    - `Tags`: choose useful tags only from `Allowed Tags`, based on the supplied context. Include tags only when that domain is clearly present in the provided context. If none of the allowed tags clearly apply, leave `Tags` empty.
 
 3. **Draft the ticket body.**
@@ -66,7 +66,7 @@ If `$ARGUMENTS` is empty, ask the user for the ticket description before continu
      - `Status` — `Inbound`
      - `Team` — `Host`, `Renter`, `Enablement`, or `SEO`
      - `Tags` — selected tags
-     - `Is Bug` — `Is Bug` or `Not Bug`
+     - `Is Bug` — `Bug` or `Not Bug`
    - Content: the drafted ticket body beginning with `## Description`.
 
 5. **Report back.**
