@@ -99,8 +99,18 @@ the stack and Notion; its only messages to you are restacks.
 - Ask GPT 6.1 Sol to review your change. Look up its provider instance and
   model id with T3's orchestrator_capabilities, then call delegate_task with
   that target. Hand it the ticket's acceptance criteria and the change:
-  git add -A, then git diff --cached refs/stack-base/<branch>. Tell it to
-  report findings (file, line, problem, why it matters) and edit nothing.
+  git add -A, then git diff --cached refs/stack-base/<branch>. Tell it to:
+  - review with mistrust: assume the change is wrong until the code proves
+    otherwise, and check every claim in the diff or ticket against the repo;
+  - check the change against each acceptance criterion and name any it
+    misses or only partly meets;
+  - look for bugs, and read every path that touches input, auth, secrets,
+    or personal data as an attacker would;
+  - flag what will make the code hard to change later, such as tangled
+    responsibilities, duplication, hidden coupling, or misleading names;
+  - look past this repo for breakage in other services, clients, jobs, or
+    data that depend on a changed API, schema, event, payload, or config;
+  - report findings (file, line, problem, why it matters) and edit nothing.
   Check each finding against the code, fix the ones that hold, and rerun
   lint and tests. Note any finding you dismiss, and why, for your report.
   If Sol is not in the catalog, skip the review and say so in your report.
