@@ -57,7 +57,7 @@ Write the summary in plain language describing the user-facing symptom or outcom
 
 ### Description
 
-```md
+````md
 <!-- Summary -->
 
 ## Demo
@@ -71,7 +71,17 @@ TODO: Add screenshots and/or videos for frontend-facing changes.
 
 <!-- Include full breakdown of architectural and design decisions and acceptance criteria here -->
 </details>
+
+<details>
+<summary>Terraform plan</summary>
+
+<!-- Root module path -->
+
+```text
+<!-- terraform plan output -->
 ```
+</details>
+````
 
 #### Summary
 
@@ -194,6 +204,7 @@ function expandSkill(command: string): string {
 - `## Demo` belongs to frontend-facing changes only; backend, infra, docs, and test-only PRs drop the section. Screenshots and videos you recorded while verifying the change become the demo: replace the TODO line with one `![<what it shows>](<path>)` per file, each path also passed to `--attach` (see Command). With nothing recorded, leave the TODO line in place for the author's screenshots.
 - `**Related Notion ticket:**` takes the ticket URL, found from the URL given, the `ENG-xxx` ID, the branch name, commit messages, or task context. `N/A` goes in only once all of those come up empty. Hold onto the page ID — step 6 and BABYSITTING.md's On merge write back to it.
 - The collapsible section carries the design decisions reviewers need (product, architecture, data model, API, UI, testing, migration, compatibility) and the acceptance criteria that shaped the work — this is where the technical specifics belong. Trivial PRs — copy changes, one-line fixes, dependency bumps, mechanical cleanup — drop the section.
+- The `Terraform plan` section belongs to PRs that change Terraform (`.tf`, `.tfvars`, `.terraform.lock.hcl`) only; every other PR drops it. Run the plan the way the repo does — a Makefile target, script, or README instructions — falling back to `terraform init -lockfile=readonly` then `terraform plan -no-color -lock=false` in each root module the diff affects, including root modules that call a changed module. Paste from `Terraform will perform the following actions` through the `Plan:` line (or the `No changes.` line), one path line and fenced block per root module. When the plans together run past 60,000 characters (GitHub caps a PR body at 65,536), cut each to its `# <resource> will be ...` lines and its `Plan:` line. Redact any secret that shows in plain text. When the plan can't run (missing credentials, init fails), put `TODO: Add terraform plan output.` in the section and tell the user why.
 
 ### Command
 
