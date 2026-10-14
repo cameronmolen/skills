@@ -2,7 +2,7 @@
 name: pr-brief
 description: Brief a pull request for its human reviewer. Requests changes on bugs, coding-standards breaks, and missing demos without asking, then shows the API, data, and logic decisions the PR makes, flags design problems, writes a review guide for high-risk PRs, recommends a verdict, posts the comments the user picks, and re-briefs once the author responds. Use when the user wants to understand or review someone else's PR.
 argument-hint: <PR URL or number>
-allowed-tools: Bash, Read, Glob, Grep, AskUserQuestion, mcp__t3-code__write_pull_request_guides, mcp__t3-code__read_pull_request_guide
+allowed-tools: Bash, Read, Glob, Grep, AskUserQuestion, mcp__notion__notion-fetch, mcp__claude_ai_Notion__notion-fetch, mcp__t3-code__write_pull_request_guides, mcp__t3-code__read_pull_request_guide
 ---
 
 A **brief** lets the reviewer decide a PR's future without reading its code. It is built from two things:
@@ -11,6 +11,8 @@ A **brief** lets the reviewer decide a PR's future without reading its code. It 
 - A **finding** is a problem worth a review comment (the kinds are in step 4). A **mechanical** finding has an objective test the author can fix against without the reviewer weighing in, so it goes straight to the author in an **auto review**. A **judgment** finding needs the reviewer's call, so it goes in the brief.
 
 Arguments: `$ARGUMENTS` is a PR URL or number. With neither, use the PR for the current branch.
+
+Review with **mistrust**: assume the PR is wrong until the code shows otherwise. The description, the ticket, the tests, and the author's comments are claims to check against the code. A passing test proves only what it asserts, and "no behavior change" is a claim like any other. Mistrust widens where you look; every finding you keep still passes the check in step 4.
 
 Steps 1 through 4 run straight through. When a mechanical finding stands, step 5 posts an auto review and the run ends there; the user sees the brief only once the author has cleared every mechanical finding. Your first question to the user comes in step 7, after the brief. Settle anything unclear before then by reading the worktree. When only the author can settle it, put it in the brief as a finding whose consequence depends on the answer.
 
@@ -45,6 +47,8 @@ gh api graphql -F owner=<owner> -F name=<repo> -F number=<n> -f query='
   }'
 ```
 
+The **linked ticket**, when the PR has one, holds acceptance criteria the description may leave out. Look in the title and body for a Notion link or `ENG-xxx` ID (fetch it with the Notion fetch tool) and for a GitHub issue reference (`gh issue view <ref> --json title,body`). Together, the description and the ticket hold the **acceptance criteria** the PR is measured against. If you can't read a linked ticket, say so in the brief instead of guessing at its criteria.
+
 This is a **re-review** when `reviews` holds one by the user. Every re-review reports which of the user's earlier threads the author addressed, auto reviews included. The brief covers the change since the `commit.oid` of the user's latest review whose body lacks the `<!-- pr-brief:auto -->` marker, the last review the user made after reading a brief. When every review by the user is an auto review, the user hasn't seen a brief yet, so brief the whole PR. If the author merged the base in since the reviewed commit, the delta also carries base changes, so leave those out. If that commit can't be fetched because it was force-pushed away, brief the whole PR.
 
 Link the PR to the current thread (if the harness being used supports it).
@@ -63,33 +67,35 @@ The user's own working tree stays untouched. Read the repo's agent docs (`AGENTS
 Read every changed file in the worktree in full, beyond its hunks, and sort each change into a decision or implementation detail. For each decision, pin down:
 
 - what it was before and what it is now
-- who depends on it: callers, clients, and consumers, found by grepping the worktree
+- who depends on it: callers, clients, and consumers, found by grepping the worktree. When the decision crosses the repo boundary (an endpoint, GraphQL type, event or job payload, shared table, env var, or published package), also search the owner's other repos with `gh search code --owner <owner> '<name>'`.
 - whether the PR description states it or the code makes it implicitly
 - your **take**: whether it holds up as the codebase grows, and what it commits the team to. A take that it doesn't hold up becomes a Design finding in step 4.
 
-The PR description gives the intended behavior. Where the code does something different, that mismatch is a finding.
+Check the code against every acceptance criterion from step 1; each shortfall becomes a Criteria finding in step 4.
 
 Then rate the PR's **merge danger**, meaning what it costs if the merge turns out wrong:
 
 - **Door**: a **two-way door** can be walked back, because a revert restores the state from before the merge. A **one-way door** can't be. Destructive actions (dropped columns, deleted data, irreversible migrations) and hard-to-reverse decisions (a contract that clients pick up before a rollback, emails or payments already sent) are one-way doors. A PR that is cheap to roll back is lower risk.
-- **Blast radius**: everything the merge could affect if it's wrong. Consider every surface the change reaches, beyond the code it touches, such as layout shift, breakages for consumers, and mobile responsiveness. The dependents you found for each decision are the starting point.
+- **Blast radius**: everything the merge could affect if it's wrong. Consider every surface the change reaches, beyond the code it touches, such as layout shift, breakages for consumers (including those in other repos), and mobile responsiveness. The dependents you found for each decision are the starting point.
 - **Deploy order**: another PR or deploy that has to land first.
 
 Then call the PR **high risk** or not. High risk means a wrong call at review is expensive to undo, so the reviewer needs to walk the change itself, beyond the brief. A PR is high risk when it is a one-way door, reshapes the architecture (a new module boundary, dependency direction, service, or pattern the rest of the codebase will follow), changes a contract that clients or other services consume, touches money, auth, or data integrity, or needs a deploy order. Judge it from the decisions and the merge danger alone: size says nothing about risk, so a ten-line migration can be high risk and a thousand-line UI refactor can be low.
 
-Done when every changed file is accounted for, either inside a named decision or as implementation detail, the merge danger names its door, every surface in its blast radius, and any deploy order, and the high-risk call names the reason that makes it so, or none.
+Done when every changed file is accounted for, either inside a named decision or as implementation detail, every decision that crosses the repo boundary has been searched for outside consumers, every acceptance criterion has been checked, the merge danger names its door, every surface in its blast radius, and any deploy order, and the high-risk call names the reason that makes it so, or none.
 
 ## 4. Hunt findings
 
 Check every decision, and the implementation detail behind it, for these kinds of finding. The first three are mechanical:
 
-- **Bug**: a wrong result, crash, data loss, or security hole on a reachable path. Name the input or state that triggers it. A bug that hinges on intent only the author knows is a judgment finding instead.
+- **Bug**: a wrong result, crash, data loss, or security hole on a reachable path, in this repo or in an outside consumer of a changed contract (cite it as `<owner>/<repo>:path:line`). Name the input or state that triggers it. A bug that hinges on intent only the author knows, such as a consumer a companion PR may already update, is a judgment finding instead. Read every path that touches input, auth, secrets, or personal data as an attacker would.
 - **Standards**: a departure from a rule in `CODING_STANDARDS.md`. Quote the rule, because the finding rests on it.
 - **Demo**: applies to the PR as a whole. The diff changes frontend UI (components, styles, templates, or user-facing copy), and neither the PR description nor the author's comments attach a demo, such as a screenshot, a recording, or a video link. The consequence is that the reviewer has to judge the UI change without seeing it. The comment asks for a short recording or before-and-after screenshots, and it goes in the review `body` because it belongs to no single line.
 
 The rest are judgment findings:
 
-- **Design**: an anti-pattern or smell whose cost shows up later, such as logic in the wrong layer, a leaky abstraction, a second source of truth, an API that is hard to evolve, or a migration with no backfill or rollback path. Name what gets harder, and for whom.
+- **Criteria**: an acceptance criterion the change misses, only partly meets, or contradicts, or behavior the description claims that the code doesn't deliver. Quote the criterion and say where it came from (description or ticket). It is a judgment finding because the scope may have changed in a conversation only the author saw.
+- **Security**: a weakened defense with no concrete exploit yet, such as a broadened permission, a disabled check, a new unauthenticated surface, or sensitive data kept longer or in more places than it needs. Name what an attacker gains if something next to it fails.
+- **Design**: a maintainability cost that shows up later, when someone has to change, extend, or debug this code. Examples are logic in the wrong layer, a leaky abstraction, a second source of truth, duplication that will drift, hidden coupling, a name that misleads about what the code does, an API that is hard to evolve, or a migration with no backfill or rollback path. Name what gets harder, and for whom.
 - **Convention**: a departure from how this codebase already solves the same problem, where no written standard covers it. Cite the existing example (`path:line`), because the finding rests on it.
 
 The bar: every finding names its **consequence**, meaning what breaks or what gets harder later. If you can't name a consequence, it's a nitpick, so drop it. Style, naming, and formatting that a linter or a later edit fixes cheaply fall below the bar, unless a written standard requires them.
@@ -134,6 +140,8 @@ The user reads the brief instead of the code. Every sentence should carry a deci
 
 <One or two plain-language sentences: the problem, and the outcome once this merges.>
 
+**Acceptance criteria** · <all met | missed or partly met: finding numbers | none stated in the PR or ticket | ticket unreadable: reason>
+
 **<Decision in a few words>** · [`path:line`](link)
 
 <Visual of the decision.>
@@ -153,7 +161,7 @@ The user reads the brief instead of the code. Every sentence should carry a deci
 
 Order the decisions most consequential first. Merge danger stays within two lines, plus the high-risk line when it applies.
 
-With no findings, the Findings section reads `None.` Recommend **Request changes** when a disputed mechanical finding, or a Design finding that shouldn't merge as-is, stands. Recommend **Comment** when the verdict hinges on something only the author can answer. Recommend **Approve** otherwise, including when the only findings are worth mentioning but not worth blocking on.
+With no findings, the Findings section reads `None.` Recommend **Request changes** when a disputed mechanical finding, or a Criteria, Security, or Design finding that shouldn't merge as-is, stands. Recommend **Comment** when the verdict hinges on something only the author can answer. Recommend **Approve** otherwise, including when the only findings are worth mentioning but not worth blocking on.
 
 ### Visuals
 
