@@ -1,20 +1,18 @@
 ---
 name: pr-brief
-description: Brief a pull request for its human reviewer. Requests changes on bugs, coding-standards breaks, and missing demos without asking, then shows the API, data, and logic decisions the PR makes, flags design problems, writes a review guide for high-risk PRs, recommends a verdict, posts the comments the user picks, and re-briefs once the author responds. Use when the user wants to understand or review someone else's PR.
+description: Brief a pull request for its human reviewer. Audits it through eight lenses with subagents, requests changes on bugs, security problems, coding-standards breaks, and missing demos without asking, then briefs the cleared PR with decision visuals, risk, blast radius, and a recommended verdict, writes a review guide, posts the verdict and comments the user sends, and re-briefs once the author responds. Use when the user wants to understand or review someone else's PR.
 argument-hint: <PR URL or number>
-allowed-tools: Bash, Read, Glob, Grep, AskUserQuestion, mcp__notion__notion-fetch, mcp__claude_ai_Notion__notion-fetch, mcp__t3-code__write_pull_request_guides, mcp__t3-code__read_pull_request_guide
+allowed-tools: Bash, Read, Glob, Grep, Agent, mcp__notion__notion-fetch, mcp__claude_ai_Notion__notion-fetch, mcp__t3-code__write_pull_request_guides, mcp__t3-code__read_pull_request_guide
 ---
 
 A **brief** lets the reviewer decide a PR's future without reading its code. It is built from two things:
 
 - A **decision** is a choice the codebase will live with after this PR merges. That covers a public API or contract (endpoints, GraphQL types, exported signatures, event payloads), the data model, a module boundary or dependency direction, a new abstraction or pattern, a rule in the logic (what gets validated, computed, or branched on), cross-cutting behavior, and config or infra. Everything else is **implementation detail**, and it stays out of the brief unless it carries a finding.
-- A **finding** is a problem worth a review comment (the kinds are in step 4). A **mechanical** finding has an objective test the author can fix against without the reviewer weighing in, so it goes straight to the author in an **auto review**. A **judgment** finding needs the reviewer's call, so it goes in the brief.
+- A **finding** is a problem one of the audit **lenses** turns up. [`LENSES.md`](LENSES.md) defines the lenses, the bar a finding must clear, and its two severities: a **blocking** finding goes straight to the author in an **auto review**, and a **note** waits in the brief for the user.
 
 Arguments: `$ARGUMENTS` is a PR URL or number. With neither, use the PR for the current branch.
 
-Review with **mistrust**: assume the PR is wrong until the code shows otherwise. The description, the ticket, the tests, and the author's comments are claims to check against the code. A passing test proves only what it asserts, and "no behavior change" is a claim like any other. Mistrust widens where you look; every finding you keep still passes the check in step 4.
-
-Steps 1 through 4 run straight through. When a mechanical finding stands, step 5 posts an auto review and the run ends there; the user sees the brief only once the author has cleared every mechanical finding. Your first question to the user comes in step 7, after the brief. Settle anything unclear before then by reading the worktree. When only the author can settle it, put it in the brief as a finding whose consequence depends on the answer.
+The run never asks the user anything. It ends one of two ways: an auto review while a blocking finding stands (step 4), or, once none stands, the brief and the review guide (steps 5 and 6). Settle anything unclear by reading the worktree. When only the author can settle it, put it in the brief as a note whose consequence depends on the answer. The user answers the brief whenever they choose, with a verdict, comments to post, or both (step 7).
 
 ## 1. Load and link the PR
 
@@ -49,7 +47,7 @@ gh api graphql -F owner=<owner> -F name=<repo> -F number=<n> -f query='
 
 The **linked ticket**, when the PR has one, holds acceptance criteria the description may leave out. Look in the title and body for a Notion link or `ENG-xxx` ID (fetch it with the Notion fetch tool) and for a GitHub issue reference (`gh issue view <ref> --json title,body`). Together, the description and the ticket hold the **acceptance criteria** the PR is measured against. If you can't read a linked ticket, say so in the brief instead of guessing at its criteria.
 
-This is a **re-review** when `reviews` holds one by the user. Every re-review reports which of the user's earlier threads the author addressed, auto reviews included. The brief covers the change since the `commit.oid` of the user's latest review whose body lacks the `<!-- pr-brief:auto -->` marker, the last review the user made after reading a brief. When every review by the user is an auto review, the user hasn't seen a brief yet, so brief the whole PR. If the author merged the base in since the reviewed commit, the delta also carries base changes, so leave those out. If that commit can't be fetched because it was force-pushed away, brief the whole PR.
+This is a **re-review** when `reviews` holds one by the user. Every re-review reports which of the user's earlier threads the author addressed, auto reviews included. Two commits bound it: the **audit base** is the `commit.oid` of the user's latest review, and the **brief base** is the `commit.oid` of the user's latest review whose body lacks the `<!-- pr-brief:auto -->` marker, the last review the user made after reading a brief. The lenses audit the change since the audit base, and the brief covers the change since the brief base. When every review by the user is an auto review, the user hasn't seen a brief yet, so brief the whole PR. If the author merged the base in since either commit, the delta also carries base changes, so leave those out. If either commit can't be fetched because it was force-pushed away, use the whole PR in its place.
 
 Link the PR to the current thread (if the harness being used supports it).
 
@@ -58,70 +56,67 @@ Link the PR to the current thread (if the harness being used supports it).
 Findings about how the PR fits the codebase need the codebase itself, beyond the diff. Build a detached worktree at the PR head, off a **base clone**:
 
 - The base clone is the current directory when `gh repo view --json nameWithOwner` matches the PR's repo. Otherwise it's `~/.cache/pr-brief/<owner>/<repo>`, created on first use with `gh repo clone <owner>/<repo> <path> -- --filter=blob:none --no-checkout`.
-- `git -C <base> fetch origin pull/<n>/head`, then `git -C <base> worktree add --detach "$TMPDIR/pr-brief/<repo>-<n>" FETCH_HEAD`. If a leftover worktree is already at that path, `git -C <base> worktree remove --force` it first. For a re-review, also fetch the last-reviewed commit: `git -C <base> fetch origin <oid>`.
+- `git -C <base> fetch origin pull/<n>/head`, then `git -C <base> worktree add --detach "$TMPDIR/pr-brief/<repo>-<n>" FETCH_HEAD`. If a leftover worktree is already at that path, `git -C <base> worktree remove --force` it first. For a re-review, also fetch the audit base and the brief base: `git -C <base> fetch origin <oid>`.
 
-The user's own working tree stays untouched. Read the repo's agent docs (`AGENTS.md`, `CLAUDE.md`, at the root and in the touched directories). They state the conventions that findings are measured against. Also read every `CODING_STANDARDS.md` that `git -C <worktree> ls-files '*CODING_STANDARDS.md'` lists at the root or above a touched file; its rules are what Standards findings cite.
+The user's own working tree stays untouched. Read the repo's agent docs (`AGENTS.md`, `CLAUDE.md`, at the root and in the touched directories). They state the conventions that findings are measured against. Also read every `CODING_STANDARDS.md` that `git -C <worktree> ls-files '*CODING_STANDARDS.md'` lists at the root or above a touched file; its rules are what the Standards lens cites.
 
-## 3. Map the decisions
+## 3. Audit through the lenses
+
+Read [`LENSES.md`](LENSES.md) now. You verify every finding against it.
+
+Save the diff beside the worktree with `gh pr diff <PR> > "$TMPDIR/pr-brief/<repo>-<n>.diff"`. Then, in one message, dispatch eight subagents in parallel on Sonnet (`model: "sonnet"`), one per lens: Criteria, Completeness, Security, Performance, Compatibility, Tests, Standards, and Maintainability. Give each one:
+
+- its lens, and the path to `LENSES.md` with the instruction to read the shared sections and its own lens
+- the PR URL, the worktree path, and the diff path. On a re-review, also the audit base, with the instruction to audit `git -C <worktree> diff <audit base> HEAD` while reading the full PR for context.
+- the acceptance criteria, quoted with their sources, or the reason there are none
+- the paths of the agent docs and `CODING_STANDARDS.md` files from step 2
+- the existing review threads, so it skips findings already raised. You check the user's own earlier threads yourself, below.
+
+Verify each finding the lenses return before you keep it: re-read the code in the worktree, and confirm the trigger, the consequence, and the severity against the bar. Merge duplicates that several lenses raise, and drop nitpicks and anything you can't confirm. A finding already raised in another reviewer's open thread stays as a note marked _already raised by @login_, and is left out of every review. When a lens agent fails, run that lens again once, and if it fails a second time, run it yourself.
+
+On a re-review, also check each blocking finding from the user's earlier auto reviews against the new head. A fixed one is gone. One the author left unfixed and unanswered still stands as blocking. One the author disputed in a reply, instead of fixing, is weighed on the argument: if it holds, drop the finding, and if it doesn't, keep it as a note marked _disputed by @author_, so the user settles it.
+
+Done when all eight lenses have returned, and every finding you kept carries a lens, a severity, a location, a consequence, and evidence.
+
+## 4. Request fixes
+
+When no blocking finding stands, go to step 5.
+
+Otherwise, post an auto review now, without asking the user. Notes wait for the brief, so leave them out of it.
+
+1. Re-read `headRefOid`. If the head moved since step 1, run steps 1 through 3 again on the new head.
+2. Draft each blocking finding's comment in the user's voice: a sentence or two naming the problem and its consequence, plus the fix. When the fix is a small, exact replacement of the commented lines, add a GitHub ` ```suggestion ` block. A finding still sitting in an open, unanswered thread from an earlier auto review gets no new comment; link it in the body instead.
+3. Post the review as step 7 shows, with `"event": "REQUEST_CHANGES"`. The body is one line per finding that has no inline comment, ending with `<!-- pr-brief:auto -->` on its own line.
+4. Remove the worktree as step 7 does, and start or relaunch monitoring as step 8 describes.
+
+Tell the user in one line what you asked for and link the review, for example "Requested changes on react-frontend#9661 (2 bugs, 1 standards break, missing demo): <url>. I'll brief it once the author responds." Then end your turn.
+
+## 5. Map the decisions
+
+Start the PR's **review guide** now, so it writes while you map and brief: a T3 Code walkthrough the user reads in the PR's Guide tab. On a re-review, call `read_pull_request_guide` and start one only when no guide exists or it is `stale`. Start it with `write_pull_request_guides({pullRequests: [{url: "<PR URL>"}]})`; it returns once the run is under way. When the tool is unavailable or the call fails (guides off, or no T3 project has the PR's repo), carry on and give the reason on the brief's guide line.
 
 Read every changed file in the worktree in full, beyond its hunks, and sort each change into a decision or implementation detail. For each decision, pin down:
 
 - what it was before and what it is now
-- who depends on it: callers, clients, and consumers, found by grepping the worktree. When the decision crosses the repo boundary (an endpoint, GraphQL type, event or job payload, shared table, env var, or published package), also search the owner's other repos with `gh search code --owner <owner> '<name>'`.
+- who depends on it: callers, clients, and consumers, starting from what the Compatibility lens found
 - whether the PR description states it or the code makes it implicitly
-- your **take**: whether it holds up as the codebase grows, and what it commits the team to. A take that it doesn't hold up becomes a Design finding in step 4.
+- your **take**: whether it holds up as the codebase grows, and what it commits the team to
 
-Check the code against every acceptance criterion from step 1; each shortfall becomes a Criteria finding in step 4.
+Then rate the PR's **risk**, meaning what it costs if the merge turns out wrong. Judge it from these three, never from size: a ten-line migration can be high risk and a thousand-line UI refactor low.
 
-Then rate the PR's **merge danger**, meaning what it costs if the merge turns out wrong:
-
-- **Door**: a **two-way door** can be walked back, because a revert restores the state from before the merge. A **one-way door** can't be. Destructive actions (dropped columns, deleted data, irreversible migrations) and hard-to-reverse decisions (a contract that clients pick up before a rollback, emails or payments already sent) are one-way doors. A PR that is cheap to roll back is lower risk.
 - **Blast radius**: everything the merge could affect if it's wrong. Consider every surface the change reaches, beyond the code it touches, such as layout shift, breakages for consumers (including those in other repos), and mobile responsiveness. The dependents you found for each decision are the starting point.
+- **Door**: a **two-way door** can be walked back, because a revert restores the state from before the merge. A **one-way door** can't be. Destructive actions (dropped columns, deleted data, irreversible migrations) and hard-to-reverse decisions (a contract that clients pick up before a rollback, emails or payments already sent) are one-way doors.
 - **Deploy order**: another PR or deploy that has to land first.
 
-Then call the PR **high risk** or not. High risk means a wrong call at review is expensive to undo, so the reviewer needs to walk the change itself, beyond the brief. A PR is high risk when it is a one-way door, reshapes the architecture (a new module boundary, dependency direction, service, or pattern the rest of the codebase will follow), changes a contract that clients or other services consume, touches money, auth, or data integrity, or needs a deploy order. Judge it from the decisions and the merge danger alone: size says nothing about risk, so a ten-line migration can be high risk and a thousand-line UI refactor can be low.
+The risk level follows:
 
-Done when every changed file is accounted for, either inside a named decision or as implementation detail, every decision that crosses the repo boundary has been searched for outside consumers, every acceptance criterion has been checked, the merge danger names its door, every surface in its blast radius, and any deploy order, and the high-risk call names the reason that makes it so, or none.
+- **High**: a wrong call at review is expensive to undo. The PR is a one-way door, reshapes the architecture (a new module boundary, dependency direction, service, or pattern the rest of the codebase will follow), changes a contract that clients or other services consume, touches money, auth, or data integrity, or needs a deploy order.
+- **Medium**: a two-way door whose blast radius reaches past the code it touches, so users, other teams, or shared callers feel a bad merge before a revert lands.
+- **Low**: a two-way door with a contained blast radius.
 
-## 4. Hunt findings
-
-Check every decision, and the implementation detail behind it, for these kinds of finding. The first three are mechanical:
-
-- **Bug**: a wrong result, crash, data loss, or security hole on a reachable path, in this repo or in an outside consumer of a changed contract (cite it as `<owner>/<repo>:path:line`). Name the input or state that triggers it. A bug that hinges on intent only the author knows, such as a consumer a companion PR may already update, is a judgment finding instead. Read every path that touches input, auth, secrets, or personal data as an attacker would.
-- **Standards**: a departure from a rule in `CODING_STANDARDS.md`. Quote the rule, because the finding rests on it.
-- **Demo**: applies to the PR as a whole. The diff changes frontend UI (components, styles, templates, or user-facing copy), and neither the PR description nor the author's comments attach a demo, such as a screenshot, a recording, or a video link. The consequence is that the reviewer has to judge the UI change without seeing it. The comment asks for a short recording or before-and-after screenshots, and it goes in the review `body` because it belongs to no single line.
-
-The rest are judgment findings:
-
-- **Criteria**: an acceptance criterion the change misses, only partly meets, or contradicts, or behavior the description claims that the code doesn't deliver. Quote the criterion and say where it came from (description or ticket). It is a judgment finding because the scope may have changed in a conversation only the author saw.
-- **Security**: a weakened defense with no concrete exploit yet, such as a broadened permission, a disabled check, a new unauthenticated surface, or sensitive data kept longer or in more places than it needs. Name what an attacker gains if something next to it fails.
-- **Design**: a maintainability cost that shows up later, when someone has to change, extend, or debug this code. Examples are logic in the wrong layer, a leaky abstraction, a second source of truth, duplication that will drift, hidden coupling, a name that misleads about what the code does, an API that is hard to evolve, or a migration with no backfill or rollback path. Name what gets harder, and for whom.
-- **Convention**: a departure from how this codebase already solves the same problem, where no written standard covers it. Cite the existing example (`path:line`), because the finding rests on it.
-
-The bar: every finding names its **consequence**, meaning what breaks or what gets harder later. If you can't name a consequence, it's a nitpick, so drop it. Style, naming, and formatting that a linter or a later edit fixes cheaply fall below the bar, unless a written standard requires them.
-
-Before keeping a finding, re-read the code around it in the worktree, and confirm the trigger and the consequence hold. Check whether a test already covers it. A false finding costs the reviewer more than a missed nitpick, and a false mechanical finding reaches the author under the user's name. A finding already raised in another reviewer's open thread stays in the brief marked _already raised by @login_, and is left out of every review.
-
-On a re-review, a mechanical finding the author disputed in a reply, instead of fixing, turns into a judgment finding. If their argument holds, drop the finding. If it doesn't, keep it in the brief marked _disputed by @author_, so the user settles it.
-
-Done when every decision from step 3 has been checked for every kind, the PR has been checked for a Demo finding, and every finding you kept carries a kind, a location, a consequence, and evidence.
-
-## 5. Request mechanical fixes
-
-When no mechanical finding stands, go to step 6.
-
-Otherwise, post an auto review now, without asking the user. Judgment findings wait for the brief, so leave them out of it.
-
-1. Re-read `headRefOid`. If the head moved since step 1, run step 1 again on the new head.
-2. Draft each comment as step 7 describes. A finding still sitting in an open, unanswered thread from an earlier auto review gets no new comment; link it in the body instead.
-3. Post the review as step 8 shows, with `"event": "REQUEST_CHANGES"`. The body is one line per finding that has no inline comment, ending with `<!-- pr-brief:auto -->` on its own line.
-4. Remove the worktree as step 8 does, and start or relaunch monitoring as step 9 describes.
-
-Tell the user in one line what you asked for and link the review, for example "Requested changes on react-frontend#9661 (2 bugs, missing demo): <url>. I'll brief it once the author responds." Then end your turn.
+Done when every changed file is accounted for, either inside a named decision or as implementation detail, the blast radius names every surface it reaches, and the risk level names the reason that sets it.
 
 ## 6. Write the brief
-
-When the PR is high risk, start its **review guide** first, so it writes while you write the brief: a T3 Code walkthrough the user reads in the PR's Guide tab. On a re-review, call `read_pull_request_guide` and start one only when no guide exists or it is `stale`. Start it with `write_pull_request_guides({pullRequests: [{url: "<PR URL>"}]})`; it returns once the run is under way. When the tool is unavailable or the call fails (guides off, or no T3 project has the PR's repo), carry on with the brief and give the reason on its guide line.
 
 The user reads the brief instead of the code. Every sentence should carry a decision, a consequence, or a verdict, so cut anything else. Link every location to the head commit (`https://github.com/<owner>/<repo>/blob/<headRefOid>/<path>#L<line>`) so the user can jump to the code when they need to.
 
@@ -129,8 +124,6 @@ The user reads the brief instead of the code. Every sentence should carry a deci
 ## <PR title> · [<owner>/<repo>#<n>](url)
 
 @<author> · app +<additions> −<deletions> · tests +<additions> −<deletions> · <changedFiles> files
-
-**Recommendation: Approve | Request changes | Comment.** <One sentence: the reason, tied to findings by number.>
 
 ### Since your last review <!-- re-reviews only -->
 
@@ -140,7 +133,7 @@ The user reads the brief instead of the code. Every sentence should carry a deci
 
 <One or two plain-language sentences: the problem, and the outcome once this merges.>
 
-**Acceptance criteria** · <all met | missed or partly met: finding numbers | none stated in the PR or ticket | ticket unreadable: reason>
+**Acceptance criteria** · <all met | missed or partly met: note numbers | none stated in the PR or ticket | ticket unreadable: reason>
 
 **<Decision in a few words>** · [`path:line`](link)
 
@@ -148,20 +141,26 @@ The user reads the brief instead of the code. Every sentence should carry a deci
 
 <One sentence, only for what the visual can't show.>
 
-### Merge danger
+### Notes
 
-**<One-way | Two-way> door** · <blast-radius surfaces, a few words each>. <Deploy order, or what a revert can't undo, when either applies.>
+1. **Maintainability** · [`path:line`](link): <problem>, so <consequence>. _Fix:_ <smallest change that resolves it>.
 
-**High risk** · <the reason>. Review guide: <writing in the PR's Guide tab | not written: reason>. <!-- high-risk PRs only -->
+### Verdict
 
-### Findings
+**Recommendation: Approve | Request changes | Comment.** <One sentence: the reason, tied to notes by number.>
 
-1. **Design** · [`path:line`](link): <problem>, so <consequence>. _Fix:_ <smallest change that resolves it>.
+**Risk** · <Low | Medium | High>: <the reason, naming the door and any deploy order>.
+
+**Blast radius** · <surfaces, a few words each>.
+
+**Review guide** · <writing in the PR's Guide tab | not written: reason>.
 ```
 
-Order the decisions most consequential first. Merge danger stays within two lines, plus the high-risk line when it applies.
+Order the decisions most consequential first. With no notes, the Notes section reads `None.`
 
-With no findings, the Findings section reads `None.` Recommend **Request changes** when a disputed mechanical finding, or a Criteria, Security, or Design finding that shouldn't merge as-is, stands. Recommend **Comment** when the verdict hinges on something only the author can answer. Recommend **Approve** otherwise, including when the only findings are worth mentioning but not worth blocking on.
+Recommend **Request changes** when a disputed finding, or a note that shouldn't merge as-is, stands. Recommend **Comment** when the verdict hinges on something only the author can answer. Recommend **Approve** otherwise, including when the only notes are worth mentioning but not worth blocking on.
+
+End your turn on the brief.
 
 ### Visuals
 
@@ -199,22 +198,13 @@ A logic diff at the right grain:
 +    refund in full
 ```
 
-## 7. Ask what to post
+## 7. Post the review
 
-Draft each finding's comment in the user's voice: a sentence or two naming the problem and its consequence, plus the fix. When the fix is a small, exact replacement of the commented lines, add a GitHub ` ```suggestion ` block.
+Run this when the user replies to the brief with a verdict (Approve, Request changes, Comment, or hold), comments to post, or both. Comments can be note numbers or comments the user writes. Draft each as step 4 drafts a comment, except that a comment the user wrote out in full posts as written. Comments with no verdict post as a Comment review.
 
-Then make one AskUserQuestion call:
+Re-read `headRefOid` first. If the head moved since the brief, say so, and re-brief the new commits instead of posting against stale lines.
 
-- **Findings**: multi-select questions, up to three findings each. Each option's label is `#<n> <short name>`, its description is the consequence, and its `preview` is the exact comment body. End every findings question with a `No comments` option, described as posting none of that question's findings, so the user can leave the PR without review comments. With more than nine findings, list them numbered in text and ask the user to reply with the numbers to post, or `none`.
-- **Verdict**: Approve, Request changes, Comment only, or Hold (post nothing). Put your recommendation first, labeled `(Recommended)`.
-
-When the user adds notes to an option, treat them as edits to that comment. With no findings, ask only the verdict question.
-
-## 8. Post the review
-
-Re-read `headRefOid` first. If the head moved while the user was deciding, say so, and re-brief the new commits instead of posting against stale lines.
-
-Post one review that carries the chosen comments and the verdict:
+Post one review that carries the comments and the verdict:
 
 ```sh
 gh api repos/<owner>/<repo>/pulls/<n>/reviews --input - <<'EOF'
@@ -225,13 +215,14 @@ EOF
 
 An inline comment has to land on a line inside the diff. When a chosen finding sits outside it, put it in the review `body` with its link.
 
-Once the review is posted, or the user holds, remove the worktree with `git -C <base> worktree remove --force "$TMPDIR/pr-brief/<repo>-<n>"`. Done when you've reported the review URL, or reported that nothing was posted.
+Once the review is posted, or the user holds, remove the worktree and diff with `git -C <base> worktree remove --force "$TMPDIR/pr-brief/<repo>-<n>"` and `rm -f "$TMPDIR/pr-brief/<repo>-<n>.diff"`. Done when you've reported the review URL, or reported that nothing was posted.
 
-## 9. Monitor the author's response
+## 8. Monitor the author's response
 
 Decide from the review you just posted:
 
-- **Not monitored yet:** start monitoring when the review asks the author to act, meaning an auto review, a Request changes review, or a Comment review with findings. Read `MONITORING.md` now and run it. After an approval or a hold, the brief is complete.
-- **Already monitored** (this run came from a monitor wake): an approval ends the monitoring with `python3 <this-skill-dir>/watch-response.py <PR-URL> --done`. For any other outcome, relaunch the monitor as `MONITORING.md` describes.
+- **Asks the author to act** (an auto review, a Request changes review, or a Comment review with comments): read `MONITORING.md` now and launch the monitor as it describes. A launch while a monitor is already live reports `already_watching` and leaves that one running.
+- **Approve**: end any monitoring with `python3 <this-skill-dir>/watch-response.py <PR-URL> --done`. It is a no-op when none ran.
+- **Hold**: leave monitoring as it is.
 
-Done when the monitor is running, or you've reported that the brief is complete and no monitor is needed.
+Done when the monitor is running, or you've reported that the review is complete and no monitor is needed.
