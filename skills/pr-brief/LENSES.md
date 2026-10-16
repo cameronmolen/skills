@@ -11,7 +11,10 @@ Every finding names its **consequence**: what breaks, or what gets harder later.
 A finding that clears the bar is one of two severities:
 
 - **Blocking**: merging as-is ships a **bug** or a **security** problem, or the PR fails an objective check the author can fix without the reviewer weighing in. A bug is a wrong result, crash, data loss, regression, or broken consumer on a reachable path. That includes a missed acceptance criterion and a slow path that real data makes time out. A security problem is an exploitable hole or a weakened defense. The objective checks are a break of a written rule in `CODING_STANDARDS.md` or the agent docs (Standards) and a UI change with no demo (Completeness). Blocking findings go to the author automatically, under the user's name.
-- **Note**: every other finding, including a departure from an unwritten convention. Notes wait in the brief for the user to post or not.
+- **Note**: every other finding, including a departure from an unwritten convention. Notes wait in the brief for the user to post or not, each rated by how much it matters before merge:
+  - **High**: shouldn't merge as-is, such as a weakened defense or a design cost that compounds as more code builds on it.
+  - **Medium**: worth fixing before merge, though merging first costs little.
+  - **Low**: worth a mention, and fine as a follow-up.
 
 A false finding costs the reviewer more than a missed one, and a false blocking finding reaches the author under the user's name. Before you keep a finding, re-read the code around it, confirm its trigger and consequence hold, and check whether a test already covers it.
 
@@ -54,7 +57,7 @@ Think past the merge: what gets harder when someone has to change, extend, or de
 Return one block per finding, most severe first:
 
 ```md
-### <Lens> · <Blocking | Note> · `path:line`
+### <Lens> · <Blocking | High note | Medium note | Low note> · `path:line`
 
 **Problem:** <what is wrong>
 **Trigger:** <the input or state that causes it>
