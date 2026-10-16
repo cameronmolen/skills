@@ -2,7 +2,7 @@
 name: pr-brief
 description: Brief a pull request for its human reviewer. Audits it through eight lenses with subagents, requests changes on bugs, security problems, coding-standards breaks, and missing demos without asking, then briefs the cleared PR with decision visuals, risk, blast radius, and a recommended verdict, writes a review guide for high-risk PRs, posts the comments and verdict the user picks, and re-briefs once the author responds. Use when the user wants to understand or review someone else's PR.
 argument-hint: <PR URL or number>
-allowed-tools: Bash, Read, Glob, Grep, Agent, AskUserQuestion, mcp__notion__notion-fetch, mcp__claude_ai_Notion__notion-fetch, mcp__t3-code__write_pull_request_guides, mcp__t3-code__read_pull_request_guide
+allowed-tools: Bash, Read, Glob, Grep, Agent, AskUserQuestion, mcp__notion__notion-fetch, mcp__claude_ai_Notion__notion-fetch, mcp__t3-code__orchestrator_capabilities, mcp__t3-code__delegate_task, mcp__t3-code__task_status, mcp__t3-code__write_pull_request_guides, mcp__t3-code__read_pull_request_guide
 ---
 
 A **brief** lets the reviewer decide a PR's future without reading its code. It is built from two things:
@@ -64,15 +64,16 @@ The user's own working tree stays untouched. Read the repo's agent docs (`AGENTS
 
 Read [`LENSES.md`](LENSES.md) now. You verify every finding against it.
 
-Save the diff beside the worktree with `gh pr diff <PR> > "$TMPDIR/pr-brief/<repo>-<n>.diff"`. Then, in one message, dispatch eight subagents in parallel on Sonnet (`model: "sonnet"`), one per lens: Criteria, Completeness, Security, Performance, Compatibility, Tests, Standards, and Maintainability. Give each one:
+Save the diff beside the worktree with `gh pr diff <PR> > "$TMPDIR/pr-brief/<repo>-<n>.diff"`. Then dispatch eight subagents in parallel on GPT 6.1 Sol, one per lens: Criteria, Completeness, Security, Performance, Compatibility, Tests, Standards, and Maintainability. Look up Sol's provider instance and model id with `orchestrator_capabilities`, then, in one message, call `delegate_task` once per lens with that `target`, `mode: "async"`, and a `clientRequestId` of `pr-brief-<repo>-<n>-<head short sha>-<lens>`. Each lens's completion wakes you, so end your turn until all eight are back. When Sol is missing from the catalog, or `delegate_task` is unavailable outside T3, run the lenses as `Agent` subagents on Sonnet (`model: "sonnet"`) instead. A delegated subagent starts without this conversation, so give each one, in its prompt:
 
 - its lens, and the path to `LENSES.md` with the instruction to read the shared sections and its own lens
 - the PR URL, the worktree path, and the diff path. On a re-review, also the audit base, with the instruction to audit `git -C <worktree> diff <audit base> HEAD` while reading the full PR for context.
 - the acceptance criteria, quoted with their sources, or the reason there are none
 - the paths of the agent docs and `CODING_STANDARDS.md` files from step 2
 - the existing review threads, so it skips findings already raised. You check the user's own earlier threads yourself, below.
+- the instruction to return findings in the format `LENSES.md` gives and to edit nothing
 
-Verify each finding the lenses return before you keep it: re-read the code in the worktree, and confirm the trigger, the consequence, and the severity against the bar. Merge duplicates that several lenses raise, and drop nitpicks and anything you can't confirm. A finding already raised in another reviewer's open thread stays as a note marked _already raised by @login_, and is left out of every review. When a lens agent fails, run that lens again once, and if it fails a second time, run it yourself.
+Verify each finding the lenses return before you keep it: re-read the code in the worktree, and confirm the trigger, the consequence, and the severity against the bar. Merge duplicates that several lenses raise, and drop nitpicks and anything you can't confirm. A finding already raised in another reviewer's open thread stays as a note marked _already raised by @login_, and is left out of every review. When a lens agent fails, run that lens again once (a fresh `clientRequestId`, suffixed `-retry`), and if it fails a second time, run it yourself.
 
 On a re-review, also check each blocking finding from the user's earlier auto reviews against the new head. A fixed one is gone. One the author left unfixed and unanswered still stands as blocking. One the author disputed in a reply, instead of fixing, is weighed on the argument: if it holds, drop the finding, and if it doesn't, keep it as a High note marked _disputed by @author_, so the user settles it.
 
