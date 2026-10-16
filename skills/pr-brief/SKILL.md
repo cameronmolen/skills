@@ -1,6 +1,6 @@
 ---
 name: pr-brief
-description: Brief a pull request for its human reviewer. Audits it through eight lenses with subagents, requests changes on bugs, security problems, coding-standards breaks, and missing demos without asking, then briefs the cleared PR with decision visuals, risk, blast radius, and a recommended verdict, writes a review guide, posts the verdict and comments the user sends, and re-briefs once the author responds. Use when the user wants to understand or review someone else's PR.
+description: Brief a pull request for its human reviewer. Audits it through eight lenses with subagents, requests changes on bugs, security problems, coding-standards breaks, and missing demos without asking, then briefs the cleared PR with decision visuals, merge danger, and a recommended verdict, writes a review guide for high-risk PRs, posts the verdict and comments the user sends, and re-briefs once the author responds. Use when the user wants to understand or review someone else's PR.
 argument-hint: <PR URL or number>
 allowed-tools: Bash, Read, Glob, Grep, Agent, mcp__notion__notion-fetch, mcp__claude_ai_Notion__notion-fetch, mcp__t3-code__write_pull_request_guides, mcp__t3-code__read_pull_request_guide
 ---
@@ -12,7 +12,7 @@ A **brief** lets the reviewer decide a PR's future without reading its code. It 
 
 Arguments: `$ARGUMENTS` is a PR URL or number. With neither, use the PR for the current branch.
 
-The run never asks the user anything. It ends one of two ways: an auto review while a blocking finding stands (step 4), or, once none stands, the brief and the review guide (steps 5 and 6). Settle anything unclear by reading the worktree. When only the author can settle it, put it in the brief as a note whose consequence depends on the answer. The user answers the brief whenever they choose, with a verdict, comments to post, or both (step 7).
+The run never asks the user anything. It ends one of two ways: an auto review while a blocking finding stands (step 4), or, once none stands, the brief (steps 5 and 6). Settle anything unclear by reading the worktree. When only the author can settle it, put it in the brief as a note whose consequence depends on the answer. The user answers the brief whenever they choose, with a verdict, comments to post, or both (step 7).
 
 ## 1. Load and link the PR
 
@@ -93,8 +93,6 @@ Tell the user in one line what you asked for and link the review, for example "R
 
 ## 5. Map the decisions
 
-Start the PR's **review guide** now, so it writes while you map and brief: a T3 Code walkthrough the user reads in the PR's Guide tab. On a re-review, call `read_pull_request_guide` and start one only when no guide exists or it is `stale`. Start it with `write_pull_request_guides({pullRequests: [{url: "<PR URL>"}]})`; it returns once the run is under way. When the tool is unavailable or the call fails (guides off, or no T3 project has the PR's repo), carry on and give the reason on the brief's guide line.
-
 Read every changed file in the worktree in full, beyond its hunks, and sort each change into a decision or implementation detail. For each decision, pin down:
 
 - what it was before and what it is now
@@ -102,21 +100,19 @@ Read every changed file in the worktree in full, beyond its hunks, and sort each
 - whether the PR description states it or the code makes it implicitly
 - your **take**: whether it holds up as the codebase grows, and what it commits the team to
 
-Then rate the PR's **risk**, meaning what it costs if the merge turns out wrong. Judge it from these three, never from size: a ten-line migration can be high risk and a thousand-line UI refactor low.
+Then rate the PR's **merge danger**, meaning what it costs if the merge turns out wrong:
 
+- **Door**: a **two-way door** can be walked back, because a revert restores the state from before the merge. A **one-way door** can't be. Destructive actions (dropped columns, deleted data, irreversible migrations) and hard-to-reverse decisions (a contract that clients pick up before a rollback, emails or payments already sent) are one-way doors. A PR that is cheap to roll back is lower risk.
 - **Blast radius**: everything the merge could affect if it's wrong. Consider every surface the change reaches, beyond the code it touches, such as layout shift, breakages for consumers (including those in other repos), and mobile responsiveness. The dependents you found for each decision are the starting point.
-- **Door**: a **two-way door** can be walked back, because a revert restores the state from before the merge. A **one-way door** can't be. Destructive actions (dropped columns, deleted data, irreversible migrations) and hard-to-reverse decisions (a contract that clients pick up before a rollback, emails or payments already sent) are one-way doors.
 - **Deploy order**: another PR or deploy that has to land first.
 
-The risk level follows:
+Then call the PR **high risk** or not. High risk means a wrong call at review is expensive to undo, so the reviewer needs to walk the change itself, beyond the brief. A PR is high risk when it is a one-way door, reshapes the architecture (a new module boundary, dependency direction, service, or pattern the rest of the codebase will follow), changes a contract that clients or other services consume, touches money, auth, or data integrity, or needs a deploy order. Judge it from the decisions and the merge danger alone: size says nothing about risk, so a ten-line migration can be high risk and a thousand-line UI refactor can be low.
 
-- **High**: a wrong call at review is expensive to undo. The PR is a one-way door, reshapes the architecture (a new module boundary, dependency direction, service, or pattern the rest of the codebase will follow), changes a contract that clients or other services consume, touches money, auth, or data integrity, or needs a deploy order.
-- **Medium**: a two-way door whose blast radius reaches past the code it touches, so users, other teams, or shared callers feel a bad merge before a revert lands.
-- **Low**: a two-way door with a contained blast radius.
-
-Done when every changed file is accounted for, either inside a named decision or as implementation detail, the blast radius names every surface it reaches, and the risk level names the reason that sets it.
+Done when every changed file is accounted for, either inside a named decision or as implementation detail, the merge danger names its door, every surface in its blast radius, and any deploy order, and the high-risk call names the reason that makes it so, or none.
 
 ## 6. Write the brief
+
+When the PR is high risk, start its **review guide** first, so it writes while you write the brief: a T3 Code walkthrough the user reads in the PR's Guide tab. On a re-review, call `read_pull_request_guide` and start one only when no guide exists or it is `stale`. Start it with `write_pull_request_guides({pullRequests: [{url: "<PR URL>"}]})`; it returns once the run is under way. When the tool is unavailable or the call fails (guides off, or no T3 project has the PR's repo), carry on with the brief and give the reason on its guide line.
 
 The user reads the brief instead of the code. Every sentence should carry a decision, a consequence, or a verdict, so cut anything else. Link every location to the head commit (`https://github.com/<owner>/<repo>/blob/<headRefOid>/<path>#L<line>`) so the user can jump to the code when they need to.
 
@@ -124,6 +120,8 @@ The user reads the brief instead of the code. Every sentence should carry a deci
 ## <PR title> · [<owner>/<repo>#<n>](url)
 
 @<author> · app +<additions> −<deletions> · tests +<additions> −<deletions> · <changedFiles> files
+
+**Recommendation: Approve | Request changes | Comment.** <One sentence: the reason, tied to notes by number.>
 
 ### Since your last review <!-- re-reviews only -->
 
@@ -141,22 +139,18 @@ The user reads the brief instead of the code. Every sentence should carry a deci
 
 <One sentence, only for what the visual can't show.>
 
+### Merge danger
+
+**<One-way | Two-way> door** · <blast-radius surfaces, a few words each>. <Deploy order, or what a revert can't undo, when either applies.>
+
+**High risk** · <the reason>. Review guide: <writing in the PR's Guide tab | not written: reason>. <!-- high-risk PRs only -->
+
 ### Notes
 
 1. **Maintainability** · [`path:line`](link): <problem>, so <consequence>. _Fix:_ <smallest change that resolves it>.
-
-### Verdict
-
-**Recommendation: Approve | Request changes | Comment.** <One sentence: the reason, tied to notes by number.>
-
-**Risk** · <Low | Medium | High>: <the reason, naming the door and any deploy order>.
-
-**Blast radius** · <surfaces, a few words each>.
-
-**Review guide** · <writing in the PR's Guide tab | not written: reason>.
 ```
 
-Order the decisions most consequential first. With no notes, the Notes section reads `None.`
+Order the decisions most consequential first. Merge danger stays within two lines, plus the high-risk line when it applies. With no notes, the Notes section reads `None.`
 
 Recommend **Request changes** when a disputed finding, or a note that shouldn't merge as-is, stands. Recommend **Comment** when the verdict hinges on something only the author can answer. Recommend **Approve** otherwise, including when the only notes are worth mentioning but not worth blocking on.
 
