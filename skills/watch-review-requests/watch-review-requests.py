@@ -47,7 +47,7 @@ query($q: String!) {
   viewer { login }
   search(query: $q, type: ISSUE, first: 50) {
     nodes { ... on PullRequest {
-      url number title isDraft reviewDecision additions deletions changedFiles
+      url number title isDraft reviewDecision additions deletions changedFiles headRefName isCrossRepository
       author { login }
       repository { nameWithOwner }
       timelineItems(itemTypes: [REVIEW_REQUESTED_EVENT], last: 20) {
@@ -83,6 +83,7 @@ def queue(me: str, nodes: list[dict]) -> dict[str, dict]:
         found[f"{pr['url']}@{requested_at}"] = {
             "url": pr["url"], "repo": pr["repository"]["nameWithOwner"], "number": pr["number"],
             "title": pr["title"], "author": (pr["author"] or {}).get("login", "ghost"),
+            "branch": pr["headRefName"], "fork": pr["isCrossRepository"],
             "requested_at": requested_at, "additions": pr["additions"], "deletions": pr["deletions"],
             "changed_files": pr["changedFiles"],
         }

@@ -37,19 +37,30 @@ The last stdout line is one JSON object. Act on its `status`:
 
 Running this skill is the user's request for one top-level thread per PR. Take the PRs in `prs` oldest `requested_at` first.
 
-1. **Map each PR's `repo` to a T3 project.** Call `t3_project_list` (page through `cursor`) once per wake, and for each project read its repo with `gh repo view --json nameWithOwner --jq .nameWithOwner`, run in the project's workspace root. A PR whose `repo` matches a project launches into it, where `pr-brief` uses that checkout as its base clone and builds its review worktree beside it. A PR with no matching project launches as `scratch`, and `pr-brief` clones the repo into its cache.
-2. **Launch one thread per PR** with `t3_thread_launch`, inheriting this thread's model and modes:
+1. **Map each PR's `repo` to a T3 project.** Call `t3_project_list` (page through `cursor`) once per wake, and for each project read its repo with `gh repo view --json nameWithOwner --jq .nameWithOwner`, run in the project's workspace root. A PR whose `repo` matches a project launches into it, where `pr-brief` uses that repo as its base clone and builds its review worktree beside it. A PR with no matching project launches as `scratch`, and `pr-brief` clones the repo into its cache.
+2. **Pick the workspace on the PR's `branch`**, so the thread opens on the PR's head branch and the user's root checkout stays on its own branch. With a matching project, find a checkout already on that branch in `git -C <project root> worktree list --porcelain`:
+
+   | Case, first match wins                  | `workspaceStrategy`                                                                  |
+   | --------------------------------------- | ------------------------------------------------------------------------------------ |
+   | `fork` is true (branch isn't on origin) | `{type: "root"}`                                                                     |
+   | Root checkout is on `branch`            | `{type: "root"}`                                                                     |
+   | Another worktree is on `branch`         | `{type: "existing_worktree", worktreePath: "<path>", branch: "<branch>"}`            |
+   | No checkout on `branch`                 | `{type: "worktree", baseRef: "<branch>", branch: "<branch>", startFromOrigin: true}` |
+
+   A PR with no matching project launches as `scratch: true`, with no branch. `pr-brief` audits from its own detached worktree at the PR head in every case, so the branch sets where the thread lives, not what it audits.
+
+3. **Launch one thread per PR** with `t3_thread_launch`, inheriting this thread's model and modes:
 
    ```
    t3_thread_launch({
      title: "[REV] <title>",
-     projectId: "<matching project id>", workspaceStrategy: {type: "root"},  // or scratch: true
+     projectId: "<matching project id>", workspaceStrategy: <from step 2>,  // or scratch: true
      message: "Use the pr-brief skill to brief <url>."
    })
    ```
 
-   Pass `workspaceStrategy: {type: "root"}` explicitly with a project: `pr-brief` reads from the project's checkout and leaves its working tree untouched, so a fresh worktree per review would be wasted setup. A re-request launches a fresh thread too; `pr-brief` reads the user's earlier review from GitHub and briefs it as a re-review.
+   When a `worktree` launch fails because the branch already exists locally, launch again with `{type: "root"}` and tell the user that thread isn't on the PR branch. A re-request launches a fresh thread too, reusing the earlier review's worktree through the `existing_worktree` case; `pr-brief` reads the user's earlier review from GitHub and briefs it as a re-review.
 
-3. **Keep each `threadId`.** `t3_thread_launch` has no retry key, so after an error or a lost response, look for the thread with `t3_thread_list` (`projectId` it launched into, `titleContains: "[REV] <title>"`) before launching again. A scratch launch that may have landed is reported to the user rather than retried.
+4. **Keep each `threadId`.** `t3_thread_launch` has no retry key, so after an error or a lost response, look for the thread with `t3_thread_list` (`projectId` it launched into, `titleContains: "[REV] <title>"`) before launching again. A scratch launch that may have landed is reported to the user rather than retried.
 
 Done when every PR in the wake has a launched thread. Report one line per PR, its title and thread, then end your turn; the relaunched watcher carries the queue from here.
