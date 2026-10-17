@@ -12,7 +12,7 @@ The harness re-invokes a thread when one of its background commands exits. The w
 node <skill-dir>/scripts/poll-prs.mjs <PLN> --wait 300
 ```
 
-It runs a pass every five minutes at no token cost and exits on the first pass with an actionable event — a merge, a PR opening, a PR closed unmerged, a base drifted off the stack, a ticket newly launchable — printing that pass's events. **Its exit is the wake: run a tick.** CI and review events land in `events.jsonl` without waking you, because the owning worker handles them through `create-pr`.
+It runs a pass every five minutes at no token cost and exits on the first pass with an actionable event — a merge, a PR opening, a PR closed unmerged, a base drifted off the stack, a layer rewritten under the layers above it, a ticket newly launchable — printing that pass's events. **Its exit is the wake: run a tick.** CI and review events land in `events.jsonl` without waking you, because the owning worker handles them through `create-pr`.
 
 The harness stops the waiter at the timeout. That re-invokes you too, with nothing new: relaunch the waiter and end the turn.
 

@@ -137,6 +137,17 @@ export function baseBranchFor(ledger, id) {
   return parent ? ledger.tickets[parent].branch : ledger.project.base_branch
 }
 
+/**
+ * The floor is always a remote ref. A parent branch resolves to origin/ once its
+ * worker has pushed (a PR number proves it) and to the local branch before that,
+ * which only resolves because every worktree shares the one clone's refs.
+ */
+export function baseRefFor(ledger, base) {
+  if (base === ledger.project.base_branch) return `origin/${base}`
+  const parent = Object.values(ledger.tickets).find((t) => t.branch === base)
+  return parent?.pr_number ? `origin/${base}` : base
+}
+
 /** Everything above `id` on the stack, bottom-to-top. These restack when `id` moves. */
 export function dependentsAbove(ledger, id) {
   const stack = ledger.project.stack ?? []

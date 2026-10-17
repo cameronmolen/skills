@@ -8,7 +8,8 @@
  * Updates the ledger's PR fields, diffs against pr-snapshot.json, and appends
  * events to events.jsonl. Actionable means the orchestrator has work: a merge
  * (Notion, a freed slot, a restack), a PR opening (Notion), a PR closed unmerged,
- * a base drifted off the stack, a ticket newly launchable. CI and review belong to
+ * a base drifted off the stack, a layer rewritten under the layers above it (a
+ * restack), a ticket newly launchable. CI and review belong to
  * the worker that owns the PR, so they are logged and never wake the orchestrator.
  *
  * `--wait` is the orchestrator's wake signal. It runs as a background task whose
@@ -24,6 +25,8 @@ import {
   frontier,
   dependentsAbove,
   baseBranchFor,
+  baseRefFor,
+  stackParentId,
   liveStack,
 } from "./lib.mjs"
 
@@ -255,6 +258,57 @@ function pass() {
       })
   }
   snapshot.__drift = drifted
+
+  // A layer rewritten in place (an operator-asked rebase, a conflict fix) strands
+  // every layer above it on the old commits. The child's fork point,
+  // refs/stack-base/<child>, falls out of the parent's history; queue the parent
+  // on pending_restack so the tick sends each thread above it a restack. Skips
+  // children with a restack already parked, so a cascade never re-queues itself,
+  // and a restacked child moves its fork point onto the new tip, which clears it.
+  const git = (args) =>
+    execFileSync("git", ["-C", ledger.project.checkout, ...args], {
+      stdio: "ignore",
+    })
+  const pending = (ledger.project.pending_restack ??= [])
+  const children = liveStack(ledger).filter((id) => {
+    const parent = stackParentId(ledger, id)
+    return parent && !ledger.tickets[id].restack && !pending.includes(parent)
+  })
+  const pushed = [
+    ...new Set(
+      children
+        .map((id) => ledger.tickets[stackParentId(ledger, id)])
+        .filter((t) => t.pr_number)
+        .map((t) => t.branch),
+    ),
+  ]
+  try {
+    if (pushed.length) git(["fetch", "--quiet", "origin", ...pushed])
+  } catch {
+    /* a stale origin/ ref only delays detection to a later pass */
+  }
+  for (const id of children) {
+    const parent = stackParentId(ledger, id)
+    const ref = baseRefFor(ledger, baseBranchFor(ledger, id))
+    try {
+      git([
+        "merge-base",
+        "--is-ancestor",
+        `refs/stack-base/${ledger.tickets[id].branch}`,
+        ref,
+      ])
+    } catch (e) {
+      // Exit 1 is "not an ancestor". Anything else is a missing ref: skip.
+      if (e.status !== 1 || pending.includes(parent)) continue
+      pending.push(parent)
+      emit({
+        kind: "layer_rewritten",
+        id: parent,
+        restack_above: dependentsAbove(ledger, parent),
+        actionable: true,
+      })
+    }
+  }
 
   // Recompute the frontier locally. A newly launchable ticket is a launch to make.
   const f = frontier(ledger)
