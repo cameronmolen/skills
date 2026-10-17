@@ -36,8 +36,8 @@ def escape_markdown_table_cell(value: str) -> str:
 
 
 def summarize(description: str) -> str:
-    sentences = re.findall(r"[^.!?]+[.!?]+|[^.!?]+$", re.sub(r"\s+", " ", description))
-    return " ".join(sentence.strip() for sentence in sentences[:3]).strip()
+    sentences = re.split(r"(?<=[.!?])\s+", re.sub(r"\s+", " ", description).strip())
+    return " ".join(sentences[:3])
 
 
 def find_skills() -> list[dict[str, str]]:
