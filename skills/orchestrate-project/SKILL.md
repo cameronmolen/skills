@@ -75,7 +75,7 @@ Your context gets summarized and your session ends. The **ledger** is what survi
 
 Per-ticket fields: `name`, `notion_id`, `status`, `notion_status`, `blocked_by[]`, `gate`, `thread_id`, `worktree_path`, `branch`, `base_branch`, `stack_index`, `pr_number`, `pr_base`, `restack`, `launched_at`, `last_checked`, `last_read_position`.
 
-`restack` holds a planned rebase waiting on its worker — `{after_merge_of, base_now, command, retarget}` — and clears with `stack.mjs restacked`. It is how a cascade survives a summarized context or a dead session.
+`restack` holds a planned rebase waiting on its worker — `{after_merge_of, cause, base_now, command, retarget}` — and clears with `stack.mjs restacked`. It is how a cascade survives a summarized context or a dead session.
 
 Project-level fields include `name`, the Notion project's title; `project_id`, the target repo's T3 project id from `t3_project_list`; `chain` and `stack` from the section above; and `pending_restack`, the merges whose restack is not yet planned.
 
@@ -132,7 +132,7 @@ Done when the operator has approved, `ledger.json` assigns every ticket a `statu
 
 A tick starts on a wake — the waiter exiting, the heartbeat finding the waiter dead, or the operator restarting the run. Run all five steps in order, every tick. Read [`WORKER.md`](WORKER.md) for the launch contract and the restack move.
 
-1. **Reconcile.** Run `scripts/poll-prs.mjs <PLN>` for one pass. It updates PR state in the ledger, marks merges, and queues each merge with live tickets above it on `pending_restack`.
+1. **Reconcile.** Run `scripts/poll-prs.mjs <PLN>` for one pass. It updates PR state in the ledger, marks merges, and queues on `pending_restack` each merge, and each layer rewritten in place (`layer_rewritten`), that has live tickets above it.
 
 2. **Restack.** Run `scripts/frontier.mjs <PLN>`. For each id in `pending_restack`, oldest first, run `scripts/stack.mjs <PLN> restack <ENG-####>`, which parks a rebase on every ticket above the merge. Then rerun `frontier.mjs` and work `restack_queue` bottom-to-top, **one worker at a time**: send the parked command, wait for `RESTACKED`, run `stack.mjs <PLN> restacked <ENG-####>`, then move to the next. Each rebase moves the base the next one rebases onto, so sending them together races the whole column. A `RESTACK_BLOCKED` reply stops the cascade there; leave its `restack` in place and name it in the report. Every later tick resumes the queue from its bottom.
 

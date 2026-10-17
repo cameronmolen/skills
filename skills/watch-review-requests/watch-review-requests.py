@@ -15,9 +15,10 @@ and a re-request after you reviewed each report once, and a relaunch after a wak
 stays quiet until something new arrives. The first launch reports everything
 already waiting.
 
-A PR that pr-brief is monitoring for its author's response belongs to that monitor,
-which wakes on re-requests itself. Its requests are recorded as reported without
-waking you, as long as the monitor's state was touched within the last hour.
+A PR that pr-brief is watching for its author's response belongs to that thread,
+which wakes on the author's pushes and comments. Its requests are recorded as
+reported without waking you, as long as pr-brief touched its marker within the
+last week.
 
 Reported requests are recorded in ~/.local/state/watch-review-requests/. Only one watcher
 runs at a time: a second launch prints {"status": "already_watching"} and exits 3.
@@ -34,13 +35,13 @@ from pathlib import Path
 
 STATE_HOME = Path(os.environ.get("XDG_STATE_HOME", Path.home() / ".local" / "state"))
 STATE_DIR = STATE_HOME / "watch-review-requests"
-MONITOR_DIR = STATE_HOME / "pr-brief-watch"  # owned by pr-brief/watch-response.py
+MONITOR_DIR = STATE_HOME / "pr-brief-watch"  # markers owned by pr-brief (MONITORING.md)
 STATE_PATH = STATE_DIR / "reported.json"
 PID_PATH = STATE_DIR / "watcher.pid"
 BASE_QUERY = "is:pr is:open draft:false archived:false user-review-requested:@me -review:approved"
 MAX_CONSECUTIVE_ERRORS = 30
 MAX_REMEMBERED = 500
-MONITOR_LEASE = 3600
+MONITOR_LEASE = 7 * 24 * 3600
 
 QUERY = """
 query($q: String!) {
@@ -93,7 +94,7 @@ def queue(me: str, nodes: list[dict]) -> dict[str, dict]:
 def monitored(pr: dict) -> bool:
     owner, name = pr["repo"].split("/")
     try:
-        return time.time() - (MONITOR_DIR / f"{owner}__{name}__{pr['number']}.json").stat().st_mtime < MONITOR_LEASE
+        return time.time() - (MONITOR_DIR / f"{owner}__{name}__{pr['number']}").stat().st_mtime < MONITOR_LEASE
     except FileNotFoundError:
         return False
 

@@ -39,7 +39,22 @@ Done when `git status --porcelain` comes back empty.
 
 ## 4. Push
 
+The remote branch can move without you: a teammate's push, or a restack force-pushed from another worktree. Sync with it before this push and every later one:
+
+```sh
+echo "old=$(git rev-parse -q --verify origin/<branch>)"; git fetch origin   # keep the old SHA
+git rev-list --left-right --count origin/<branch>...HEAD   # remote-only, then local-only
+```
+
+- No `origin/<branch>` yet, or no remote-only commits: push.
+- Remote-only commits: reconcile onto the remote first. When `git rev-list <old>..HEAD` is empty, every local commit is already pushed, so `git reset --hard origin/<branch>`. Otherwise `git rebase --onto origin/<branch> <old>` replays only the commits made here since the last sync. A conflict, or no old SHA, goes to the user.
+- In an orchestrate-project stack (`refs/stack-base/<branch>` exists), also check that the layer below still holds your fork point: `git merge-base --is-ancestor refs/stack-base/<branch> <base ref>`, where `<base ref>` is `origin/<base>`, or the local `<base>` before it has ever been pushed. A failure means the layer below was rewritten: push nothing, tell the user, and wait for the orchestrator's restack message, which carries the exact commands.
+
+The base branch may be checked out in another worktree. Read it by ref and leave its checkout to that worktree.
+
 `git push -u origin HEAD`
+
+Done when the push lands as a fast-forward of `origin/<branch>`.
 
 ## 5. Create the PR
 

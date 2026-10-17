@@ -2,7 +2,7 @@
 name: pr-brief
 description: Brief a pull request for its human reviewer. Audits it through eight lenses with subagents, requests changes on bugs, security problems, coding-standards breaks, and missing demos without asking, then briefs the cleared PR with decision visuals, risk, blast radius, and a recommended verdict, writes a review guide for high-risk PRs, posts the comments and verdict the user picks, and re-briefs once the author responds. Use when the user wants to understand or review someone else's PR.
 argument-hint: <PR URL or number>
-allowed-tools: Bash, Read, Glob, Grep, Agent, AskUserQuestion, mcp__notion__notion-fetch, mcp__claude_ai_Notion__notion-fetch, mcp__t3-code__orchestrator_capabilities, mcp__t3-code__delegate_task, mcp__t3-code__task_status, mcp__t3-code__write_pull_request_guides, mcp__t3-code__read_pull_request_guide
+allowed-tools: Bash, Read, Glob, Grep, Agent, AskUserQuestion, mcp__notion__notion-fetch, mcp__claude_ai_Notion__notion-fetch, mcp__t3-code__orchestrator_capabilities, mcp__t3-code__delegate_task, mcp__t3-code__task_status, mcp__t3-code__write_pull_request_guides, mcp__t3-code__read_pull_request_guide, mcp__t3-code__link_pull_request, mcp__t3-code__watch_pull_request, mcp__t3-code__unwatch_pull_request
 ---
 
 A **brief** lets the reviewer decide a PR's future without reading its code. It is built from two things:
@@ -88,7 +88,7 @@ Otherwise, post an auto review now, without asking the user. Notes wait for the 
 1. Re-read `headRefOid`. If the head moved since step 1, run steps 1 through 3 again on the new head.
 2. Draft each blocking finding's comment in the user's voice: a sentence or two naming the problem and its consequence, plus the fix. When the fix is a small, exact replacement of the commented lines, add a GitHub ` ```suggestion ` block. A finding still sitting in an open, unanswered thread from an earlier auto review gets no new comment; link it in the body instead.
 3. Post the review as step 8 shows, with `"event": "REQUEST_CHANGES"`. The body is one line per finding that has no inline comment, ending with `<!-- pr-brief:auto -->` on its own line.
-4. Remove the worktree as step 8 does, and start or relaunch monitoring as step 9 describes.
+4. Remove the worktree as step 8 does, and start monitoring as step 9 describes.
 
 Tell the user in one line what you asked for and link the review, for example "Requested changes on react-frontend#9661 (2 bugs, 1 standards break, missing demo): <url>. I'll brief it once the author responds." Then end your turn.
 
@@ -225,8 +225,8 @@ Once the review is posted, or the user holds, remove the worktree and diff with 
 
 Decide from the review you just posted:
 
-- **Asks the author to act** (an auto review, a Request changes review, or a Comment review with comments): read `MONITORING.md` now and launch the monitor as it describes. A launch while a monitor is already live reports `already_watching` and leaves that one running.
-- **Approve**: end any monitoring with `python3 <this-skill-dir>/watch-response.py <PR-URL> --done`. It is a no-op when none ran.
+- **Asks the author to act** (an auto review, a Request changes review, or a Comment review with comments): read `MONITORING.md` now and start the watch as it describes.
+- **Approve**: end any monitoring. Call `unwatch_pull_request` with the PR URL, then `rm -f "${XDG_STATE_HOME:-$HOME/.local/state}/pr-brief-watch/<owner>__<repo>__<n>"`.
 - **Hold**: leave monitoring as it is.
 
-Done when the monitor is running, or you've reported that the review is complete and no monitor is needed.
+Done when the watch is running, or you've reported that the review is complete and no watch is needed.

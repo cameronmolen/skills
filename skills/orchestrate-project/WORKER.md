@@ -168,7 +168,8 @@ exactly one line:
   RESTACKED <branch>                  once the force-push has landed
   RESTACK_BLOCKED <branch>: <why>     when a conflict needs the operator
 Those are the rebases and force-pushes you make unprompted. Any other history
-change waits for the operator to ask for it.
+change waits for the operator to ask for it; once it lands, the orchestrator
+sees it and restacks every layer above you.
 ```
 
 **`refs/stack-base/<branch>` is the whole restack mechanism.** A rebase needs the fork point, and once the parent branch has itself been rebased, `git merge-base` no longer finds it. The ref is written before the first commit and updated on every restack, so it always names the exact commit the branch was cut from. Worktrees share the one clone's ref store, so the orchestrator and every sibling worker can resolve it.
@@ -185,10 +186,12 @@ The poller queues the merge on `pending_restack`. `scripts/stack.mjs <PLN> resta
 - `retarget` — a `gh pr edit --base` when the base branch name changed. Only the entry directly above a merge gets one; the rest keep the same parent, whose history simply moved.
 - `base_now` — the ticket's new base, which the worker needs for its PR.
 
-`frontier.mjs` lists the parked entries bottom-to-top as `restack_queue`. Send the bottom one to its `thread_id`:
+`frontier.mjs` lists the parked entries bottom-to-top as `restack_queue`. Send the bottom one to its `thread_id`, opening with the line for its `cause`:
 
 ```
-<merged branch> merged into <floor>. The branch below you moved, so restack.
+<merged branch> merged into <floor>.          (cause: merged)
+<rewritten branch> was rewritten in place.    (cause: rewritten)
+The branch below you moved, so restack.
 Your base is now <base_now>.
   <command>
 Then <retarget, when present>.
@@ -201,6 +204,10 @@ On `RESTACKED`, run `stack.mjs <PLN> restacked <ENG-####>` and send the next. On
 **A parked entry may already be in flight.** Before sending, read the worker's thread from `last_read_position`. A `RESTACKED` there means it landed while you were away: clear it and move on. Your own restack message there with no reply yet means it is still working: wait on it rather than resending.
 
 **Never run git in a live worker's worktree yourself.** The worker may be mid-edit, and you will race it. The only worktree you may touch directly is one whose thread is terminal.
+
+## Restack on rewrite
+
+A layer rewritten in place, by an operator-asked rebase or a conflict fix, strands every layer above it the same way a merge does. `poll-prs.mjs` catches it: a child's `refs/stack-base/<child>` drops out of its parent's history. It queues the parent on `pending_restack` and wakes you with `layer_rewritten`, and the tick restacks the column above it exactly as for a merge, with `cause: rewritten` and no retarget.
 
 ## Reading workers cheaply
 

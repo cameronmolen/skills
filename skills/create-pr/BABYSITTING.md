@@ -21,19 +21,29 @@ Own the terminal for the whole active loop. Consume watcher output in the same t
 
 ## Watching
 
-At handoff, tell the user in a line or two that the PR is at handoff and being watched, then end your turn. T3 Code checks the PR every minute and wakes you with a message, so its silence means there is nothing to do. It skips comments from the user's GitHub account, so your own replies won't wake you. The watch lives on the thread's PR link and survives app restarts.
+At handoff, tell the user in a line or two that the PR is at handoff and being watched, then end your turn. T3 Code checks the PR every two minutes and wakes you with a message, so its silence means there is nothing to do. It skips comments from the user's GitHub account, so your own replies won't wake you. The watch lives on the thread's PR link and survives app restarts.
 
-A merge or close ends the watch **without waking you**. The **merge waiter** catches it, launched with the Bash tool and `run_in_background: true`:
+A merge or close ends the watch **without waking you**. The **merge waiter** catches it, launched with the Bash tool, `run_in_background: true`, and `timeout: 7200000`:
 
 ```sh
-while [ "$(gh pr view <PR-URL> --json state --jq .state)" = OPEN ]; do sleep 300; done; gh pr view <PR-URL> --json state,mergedAt
+for i in $(seq 23); do [ "$(gh pr view <PR-URL> --json state --jq .state)" = OPEN ] || break; sleep 300; done; gh pr view <PR-URL> --json state --jq .state
 ```
 
-It exits when the PR leaves `OPEN`. When the harness stops it while the PR is still open, relaunch it. It dies with the session; running `/create-pr` again on the branch starts babysitting over from the top.
+The harness kills background commands at two hours, so the waiter gives up at 115 minutes and prints the state itself. `OPEN` means it timed out: relaunch it and end your turn. It dies with the session; running `/create-pr` again on the branch starts babysitting over from the top.
 
 ### On each wake
 
-A watch wake is a message headed `Update on pull request #<n>`. It can arrive about something the active loop already handled, because a wake that lands mid-turn queues behind it, so check before redoing work. Before patching, run `git pull --ff-only`, since someone else may have pushed during the watch. Then act on each item:
+A watch wake is a message headed `Update on pull request #<n>`. Read the PR (`gh pr view <PR> --json headRefOid,state,comments,reviews`) first, then drop the **stale** items, the ones that need nothing from you:
+
+- Checks on a `<sha>` other than the current `headRefOid`. The head's own checks wake you when they finish.
+- A comment already answered (see Review feedback), often by the active loop before a mid-turn wake was delivered.
+- A bot's progress placeholder, such as `Claude is working…`. The bot rewrites it in place when it finishes, and an edit never wakes you, so wait on the rewrite with the Bash tool, `run_in_background: true`, and `timeout: 1800000`, then end your turn. Its exit is the wake to answer the finished comment as feedback.
+
+  ```sh
+  until ! gh api repos/<owner>/<repo>/issues/comments/<id> --jq .body | grep -qF '<placeholder text>'; do sleep 60; done
+  ```
+
+A wake with only stale items ends your turn in one line. Before patching, sync with the remote as SKILL.md step 4 does, since someone else may have pushed or restacked during the watch. Then act on each remaining item:
 
 | Item                                         | Do                                                                                                                                                   |
 | -------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -60,7 +70,7 @@ Done when a re-fetch shows `Status` at `In verification`, or at the untouched va
 
 ## Review feedback
 
-Every piece of feedback from a reviewer, human or bot, ends up **answered**. That means a reply is posted on it, and if it's an inline thread, the thread is resolved. Replies post under the user's GitHub account, so write them the way the PR author would: a sentence or two with the substance the reviewer needs.
+Every piece of feedback from a reviewer, human or bot, ends up **answered**. That means a reply is posted on it, and if it's an inline thread, the thread is resolved. Replies post under the user's GitHub account, so write them the way the PR author would: a sentence or two with the substance the reviewer needs. Name a bot in backticks (`` `@claude` ``) or without the `@`: a bare `@claude` summons the review bot for another run.
 
 For each item, pick the response:
 
@@ -96,7 +106,7 @@ gh api graphql -F id=<thread_id> -f query='
   mutation($id: ID!) { resolveReviewThread(input: {threadId: $id}) { thread { isResolved } } }'
 ```
 
-Top-level feedback comes from `gh pr view <PR> --json reviews,comments`. Answer it with `gh pr comment <PR> --body '<reply>'`: @mention the author and quote the line you're answering.
+Top-level feedback comes from `gh pr view <PR> --json reviews,comments`. Answer it with `gh pr comment <PR> --body '<reply>'`: @mention the author (a bot by name, as above) and quote the line you're answering. Run `gh pr comment` with no `--jq` or `--json`, which make it post nothing and still exit cleanly. The comment URL it prints is your confirmation that it posted.
 
 ## CI failures
 
@@ -115,7 +125,7 @@ Once reviews and CI are handled, read `mergeable`, `mergeStateStatus`, `reviewDe
 
 ## Fixes made during the loop
 
-Keep each fix minimal and tied to the CI, review, or mergeability issue raised on the PR. Name that issue in the commit message, and push to the PR branch.
+Keep each fix minimal and tied to the CI, review, or mergeability issue raised on the PR. Name that issue in the commit message, and push to the PR branch as SKILL.md step 4 does.
 
 ## Escalation
 
