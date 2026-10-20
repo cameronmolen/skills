@@ -2,7 +2,7 @@
 
 Babysitting ends when the PR is **merged or closed**. Until then it alternates between two modes:
 
-- **Active**: work the PR to **handoff**, meaning CI green, mergeable, and every piece of review feedback **answered** (see Review feedback).
+- **Active**: work the PR to **handoff**, meaning CI green, mergeable, and every piece of review feedback **answered** and its human reviewers re-requested (see Review feedback).
 - **Watching**: T3 Code's `watch_pull_request` waits on reviewers and CI for you at no token cost, for hours or days. Each time it messages you, you **wake** and go back to Active.
 
 Babysitting starts with two things, before the first active pass: call `watch_pull_request` with the PR URL, and launch the merge waiter (see Watching). Only comments posted after the call wake you, so watching first leaves no gap between what the active loop reads and what the watch reports. Handoff is where your turn ends and the watch takes over. Merging is always the user's call.
@@ -107,6 +107,12 @@ gh api graphql -F id=<thread_id> -f query='
 ```
 
 Top-level feedback comes from `gh pr view <PR> --json reviews,comments`. Answer it with `gh pr comment <PR> --body '<reply>'`: @mention the author (a bot by name, as above) and quote the line you're answering. Run `gh pr comment` with no `--jq` or `--json`, which make it post nothing and still exit cleanly. The comment URL it prints is your confirmation that it posted.
+
+Once every piece of a human reviewer's feedback is answered, **re-request** their review, which puts the PR back in their queue. This covers each human whose latest review in `reviews` is `CHANGES_REQUESTED` or `COMMENTED`. An `APPROVED` reviewer is done, and bots are left to their own triggers.
+
+```sh
+gh api repos/<owner>/<repo>/pulls/<PR>/requested_reviewers -f 'reviewers[]=<login>'
+```
 
 ## CI failures
 
