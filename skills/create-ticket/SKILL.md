@@ -1,7 +1,6 @@
 ---
 name: create-ticket
 description: Create a single Notion ticket in Neighbor's Project Tasks database from a user-provided issue, bug report, request, Slack thread, support context, or brief description. Use this whenever the user asks to create, file, open, or write a Notion ticket/task, especially for a bug or product request.
-disable-model-invocation: true
 argument-hint: <issue-or-request-description>
 ---
 
