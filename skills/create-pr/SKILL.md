@@ -2,7 +2,7 @@
 name: create-pr
 description: Open a pull request for the current changes, then babysit it until it merges. Use when the user wants to open a PR, push changes for review, or babysit an existing PR.
 argument-hint: [ENG-xxx]
-allowed-tools: Agent, Bash, Read, Edit, MultiEdit, Glob, Grep, AskUserQuestion, ToolSearch, mcp__notion__notion-fetch, mcp__notion__notion-search, mcp__notion__notion-update-page, mcp__claude_ai_Notion__notion-fetch, mcp__claude_ai_Notion__notion-search, mcp__claude_ai_Notion__notion-update-page, mcp__t3-code__link_pull_request, mcp__t3-code__watch_pull_request, mcp__t3-code__unwatch_pull_request
+allowed-tools: Agent, Bash, Read, Edit, MultiEdit, Glob, Grep, AskUserQuestion, ToolSearch, Skill, mcp__notion__notion-fetch, mcp__notion__notion-search, mcp__notion__notion-update-page, mcp__notion__notion-create-pages, mcp__claude_ai_Notion__notion-fetch, mcp__claude_ai_Notion__notion-search, mcp__claude_ai_Notion__notion-update-page, mcp__claude_ai_Notion__notion-create-pages, mcp__t3-code__link_pull_request, mcp__t3-code__t3_thread_update, mcp__t3-code__watch_pull_request, mcp__t3-code__unwatch_pull_request
 ---
 
 Work the steps in order.
@@ -56,11 +56,29 @@ The base branch may be checked out in another worktree. Read it by ref and leave
 
 Done when the push lands as a fast-forward of `origin/<branch>`.
 
-## 5. Create the PR
+## 5. Find or create the ticket
+
+Every PR links a ticket in the Project Tasks data source (`collection://9bde6985-9747-4684-b969-c8ecec481b63`). Take the first source that names one:
+
+- the `ENG-xxx` in `$ARGUMENTS`, or a ticket URL or `ENG-xxx` in this thread;
+- the branch name or commit messages;
+- the existing PR's `**Related Notion ticket:**` line, when the PR is already open.
+
+None of those: search the data source with the Notion search tool (`data_source_url` set to the `collection://` URL), querying on the change's plain-language outcome and its key nouns. A **match** is an open ticket whose description asks for the work this diff does; `Done` and `Abandoned` tickets are closed work and never match.
+
+- One clear match: use it.
+- Several plausible matches: ask the user to pick one or create a new ticket.
+- No match: invoke the `create-ticket` skill, passing a plain-language description of the change (the user-facing problem or outcome, why it matters, and any links from this thread).
+
+Fetch the ticket and hold its URL, page ID, `ENG-xxx` ID, and title. Step 6 uses the ID in the PR title and the URL in the description; step 7 and BABYSITTING.md's On merge write back to the page ID.
+
+Done when you hold the ticket's URL, page ID, and `ENG-xxx` ID, or the user has declined a ticket and the PR goes out with `N/A`.
+
+## 6. Create the PR
 
 ### Title
 
-An `ENG-xxx` prefix when a task ID was given, then a brief title-case summary of what the change does: `ENG-1000 Create Get User Endpoint`, `Fix Search Results Pagination`.
+The ticket's `ENG-xxx` prefix (dropped only when step 5 ended without a ticket), then a brief title-case summary of what the change does: `ENG-1000 Create Get User Endpoint`, `Fix Search Results Pagination`.
 
 Write the summary in plain language describing the user-facing symptom or outcome, not the internal mechanism, class/method name, or implementation detail — a non-engineer skimming the PR list should understand what changed and why it matters. Save the technical specifics for the description body.
 
@@ -217,7 +235,7 @@ function expandSkill(command: string): string {
 #### Other Description Sections
 
 - `## Demo` belongs to frontend-facing changes only; backend, infra, docs, and test-only PRs drop the section. Screenshots and videos you recorded while verifying the change become the demo: replace the TODO line with one `![<what it shows>](<path>)` per file, each path also passed to `--attach` (see Command). With nothing recorded, leave the TODO line in place for the author's screenshots.
-- `**Related Notion ticket:**` takes the ticket URL, found from the URL given, the `ENG-xxx` ID, the branch name, commit messages, or task context. `N/A` goes in only once all of those come up empty. Hold onto the page ID — step 6 and BABYSITTING.md's On merge write back to it.
+- `**Related Notion ticket:**` takes step 5's ticket URL, or `N/A` when step 5 ended without one.
 - The collapsible section carries the design decisions reviewers need (product, architecture, data model, API, UI, testing, migration, compatibility) and the acceptance criteria that shaped the work — this is where the technical specifics belong. Trivial PRs — copy changes, one-line fixes, dependency bumps, mechanical cleanup — drop the section.
 - The `Terraform plan` section belongs to PRs that change Terraform (`.tf`, `.tfvars`, `.terraform.lock.hcl`) only; every other PR drops it. Run the plan the way the repo does — a Makefile target, script, or README instructions — falling back to `terraform init -lockfile=readonly` then `terraform plan -no-color -lock=false` in each root module the diff affects, including root modules that call a changed module. Paste from `Terraform will perform the following actions` through the `Plan:` line (or the `No changes.` line), one path line and fenced block per root module. When the plans together run past 60,000 characters (GitHub caps a PR body at 65,536), cut each to its `# <resource> will be ...` lines and its `Plan:` line. Redact any secret that shows in plain text. When the plan can't run (missing credentials, init fails), put `TODO: Add terraform plan output.` in the section and tell the user why.
 
@@ -231,11 +249,15 @@ One `--attach` per demo file; drop the flag when there are none. gh uploads each
 
 When the PR already exists, `gh pr view --json url,state,number,headRefName,baseRefName` names the target instead; attach demo files recorded since with `gh pr edit <PR> --attach <path>`, which appends them to the existing body.
 
-Link the PR to this thread with `link_pull_request` as soon as you hold its URL, so T3 Code shows its status beside the thread.
+Link the PR to this thread with `link_pull_request` as soon as you hold its URL, so T3 Code shows its status beside the thread. Then rename this thread to the PR's exact title, so the thread list reads the same as the PR list:
 
-Done when you hold a linked PR URL, every placeholder comment in the body has resolved to real content or `N/A`, and every recorded demo file shows in the body as an uploaded asset.
+```
+t3_thread_update({action: "rename", title: "<PR title>"})
+```
 
-## 6. Append the PR to the Notion ticket
+Done when you hold a linked PR URL, the thread title matches the PR title, every placeholder comment in the body has resolved to real content or `N/A`, and every recorded demo file shows in the body as an uploaded asset.
+
+## 7. Append the PR to the Notion ticket
 
 Skip when step 5 turned up no ticket.
 
@@ -251,9 +273,9 @@ Skip when step 5 turned up no ticket.
 3. Decide on `Status`. `Status` values on this data source: `Blocked`, `Inbound`, `Ready`, `In progress`, `In review`, `In verification`, `Abandoned`, `Done`. Move it to `In review` only when the current value is `Blocked`, `Inbound`, `Ready`, or `In progress` — those are the states linking a PR should advance out of. Leave `In review`, `In verification`, `Abandoned`, and `Done` untouched; each is either already past this point or a state a human parked it in on purpose, and this step never moves a ticket backward.
 4. Write with the Notion update-page tool: the page ID, `command: "update_properties"`, `properties` carrying `"PR(s)"` (when it changed) and `"Status": "In review"` (when step 3 called for it). Skip the call entirely when neither changed.
 
-Done when a re-fetch shows `PR(s)` holding every pre-existing entry plus the new URL and `Status` reflecting step 3's decision; report both alongside the ticket URL. A failed write is reported with the values you meant to write, and step 7 continues.
+Done when a re-fetch shows `PR(s)` holding every pre-existing entry plus the new URL and `Status` reflecting step 3's decision; report both alongside the ticket URL. A failed write is reported with the values you meant to write, and step 8 continues.
 
-## 7. Babysit the PR
+## 8. Babysit the PR
 
 Read `BABYSITTING.md` now and run it.
 
@@ -262,4 +284,4 @@ Done when the PR is closed, or merged and On merge is done.
 ## Guardrails
 
 - Commit and push through the hooks; `--no-verify` stays out of every command.
-- A failing step stops the run and reports the error rather than retrying blindly. Step 6 is the exception: report and carry on to step 7.
+- A failing step stops the run and reports the error rather than retrying blindly. Step 7 is the exception: report and carry on to step 8.
