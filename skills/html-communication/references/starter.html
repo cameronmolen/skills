@@ -1,0 +1,185 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{Headline}}</title>
+<style>
+  @font-face { font-family: 'Inter'; src: url(data:font/woff2;base64,__INTER__) format('woff2'); font-weight: 400 700; font-style: normal; }
+  @font-face { font-family: 'GT-Ultra'; src: url(data:font/woff2;base64,__GT__) format('woff2'); font-weight: 700; font-style: normal; }
+
+  :root {
+    color-scheme: light;
+    --page: #F2EFE8;        /* warm neutral */
+    --card: #FFFFFF;
+    --tint: #EFF5F8;        /* cool tint */
+    --ink: #232323;
+    --ink-2: #63666A;
+    --muted: #888B8D;
+    --grid: #EBEBEB;
+    --axis: #D9D9D6;
+    --s1: #1767FF;          /* primary series */
+    --s2: #D3832B;          /* second series: value-label every mark */
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--page); color: var(--ink);
+    font: 16px/1.55 Inter, Roboto, system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  main { max-width: 920px; margin: 0 auto; padding: 56px 20px 72px; }
+  .eyebrow { font-size: 13px; font-weight: 600; letter-spacing: .02em; color: var(--ink-2); margin: 0 0 12px; }
+  h1 {
+    font-family: 'GT-Ultra', ui-serif, Georgia, serif; font-weight: 700;
+    font-size: clamp(30px, 4.6vw, 42px); line-height: 1.15; letter-spacing: -0.01em;
+    margin: 0 0 16px; max-width: 20ch;
+  }
+  h2 { font-size: 18px; font-weight: 600; margin: 0 0 4px; }
+  .lede { font-size: 18px; color: var(--ink-2); max-width: 62ch; margin: 0 0 32px; }
+  .lede b { color: var(--ink); font-weight: 600; }
+
+  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr)); gap: 12px; margin-bottom: 12px; }
+  .stat, .card { background: var(--card); border-radius: 16px; }
+  .stat { padding: 18px 20px; }
+  .stat .k { font-size: 13px; font-weight: 600; color: var(--ink-2); margin: 0 0 6px; }
+  .stat .v { font-size: 30px; font-weight: 600; letter-spacing: -0.01em; margin: 0; }
+  .stat .v .arrow { color: var(--muted); font-weight: 400; margin: 0 6px; }
+  .stat .s { font-size: 13px; color: var(--muted); margin: 4px 0 0; }
+
+  .card { padding: 22px 22px 16px; margin-top: 12px; position: relative; }
+  .sub { font-size: 14px; color: var(--ink-2); margin: 0 0 14px; max-width: 70ch; }
+  .legend { display: flex; gap: 18px; flex-wrap: wrap; font-size: 13px; color: var(--ink-2); margin: 0 0 8px; }
+  .legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+  svg { display: block; width: 100%; height: auto; overflow: visible; }
+  svg text { font-family: Inter, Roboto, system-ui, sans-serif; }
+  .tick { fill: var(--muted); font-size: 11px; font-variant-numeric: tabular-nums; }
+  .val { fill: var(--ink); font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .lab { fill: var(--ink-2); font-size: 12px; }
+
+  .tip {
+    position: absolute; pointer-events: none; opacity: 0; z-index: 2;
+    background: var(--card); color: var(--ink); border-radius: 10px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.16);
+    padding: 8px 12px; font-size: 13px; line-height: 1.5; white-space: nowrap; transition: opacity 80ms;
+  }
+  .tip .m { color: var(--muted); }
+  .tip .row { display: flex; align-items: center; gap: 6px; font-variant-numeric: tabular-nums; }
+
+  .takeaways { background: var(--tint); border-radius: 16px; padding: 22px 24px; margin-top: 12px; }
+  .takeaways ul { margin: 8px 0 0; padding-left: 20px; }
+  .takeaways li { margin: 0 0 10px; max-width: 72ch; }
+  .takeaways li:last-child { margin-bottom: 0; }
+  .foot { font-size: 12px; color: var(--muted); margin: 24px 0 0; max-width: 80ch; line-height: 1.6; }
+  code { font-size: .92em; }
+</style>
+</head>
+<body>
+<main>
+  <p class="eyebrow">{{Context}} · {{Mon D, YYYY}}</p>
+  <h1>{{Headline that states the conclusion}}</h1>
+  <p class="lede">{{One or two sentences; <b>bold</b> the words that carry the finding.}}</p>
+
+  <!-- Optional: delete the whole section when there is no before → after story. -->
+  <section class="stats" aria-label="{{What these numbers compare}}">
+    <div class="stat"><p class="k">{{Metric}}</p><p class="v">{{Before}}<span class="arrow">→</span>{{After}}</p><p class="s">{{Scope}}</p></div>
+    <div class="stat"><p class="k">{{Metric}}</p><p class="v">{{Before}}<span class="arrow">→</span>{{After}}</p><p class="s">{{Scope}}</p></div>
+    <div class="stat"><p class="k">{{Metric}}</p><p class="v">{{Before}}<span class="arrow">→</span>{{After}}</p><p class="s">{{Scope}}</p></div>
+  </section>
+
+  <!-- One card per chart, at most three. -->
+  <section class="card" id="chart1Card">
+    <h2>{{Chart title that states what it shows}}</h2>
+    <p class="sub">{{One line: what to notice, or the comparison that makes it fair.}}</p>
+    <div class="legend">
+      <span><i class="dot" style="background:var(--s1)"></i>{{Series 1}}</span>
+      <span><i class="dot" style="background:var(--s2)"></i>{{Series 2}}</span>
+    </div>
+    <div id="chart1"></div>
+    <div class="tip" id="chart1Tip"></div>
+  </section>
+
+  <section class="takeaways">
+    <h2>What this means</h2>
+    <ul>
+      <li><b>{{Bolded lead.}}</b> {{Support in one or two sentences.}}</li>
+      <li><b>{{Bolded lead.}}</b> {{Support.}}</li>
+      <li><b>{{Bolded lead.}}</b> {{Support.}}</li>
+    </ul>
+  </section>
+
+  <p class="foot">{{Periods, definitions, exclusions, and source table, in one paragraph.}}</p>
+</main>
+
+<script>
+(() => {
+  const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+  const NS = 'http://www.w3.org/2000/svg';
+  const el = (tag, attrs = {}, parent) => {
+    const e = document.createElementNS(NS, tag);
+    for (const k in attrs) e.setAttribute(k, attrs[k]);
+    if (parent) parent.appendChild(e);
+    return e;
+  };
+  const sw = c => `<i class="dot" style="background:${c}"></i>`;
+  function showTip(tip, card, html, e) {
+    tip.innerHTML = html; tip.style.opacity = 1;
+    const cr = card.getBoundingClientRect(), tw = tip.offsetWidth, th = tip.offsetHeight;
+    let left = e.clientX - cr.left + 14, top = e.clientY - cr.top - th - 10;
+    if (left + tw > cr.width - 4) left = e.clientX - cr.left - tw - 14;
+    if (top < 4) top = e.clientY - cr.top + 14;
+    tip.style.left = left + 'px'; tip.style.top = top + 'px';
+  }
+  const hideTip = tip => { tip.style.opacity = 0; };
+
+  // Line chart: 2.5px lines, white-ringed dots, recessive grid, endpoint value labels,
+  // series names at the right edge, hover crosshair + tooltip. Adapt or replace per chart.
+  function lineChart(id, { labels, series, yMax, ticks, fmt, tipTitle }) {
+    const host = document.getElementById(id), card = document.getElementById(id + 'Card'), tip = document.getElementById(id + 'Tip');
+    const W = 880, H = 300, m = { l: 40, r: 110, t: 14, b: 30 }, n = labels.length;
+    const x = i => m.l + (i + 0.5) * (W - m.l - m.r) / n;
+    const y = v => m.t + (1 - v / yMax) * (H - m.t - m.b);
+    const svg = el('svg', { viewBox: `0 0 ${W} ${H}`, role: 'img', 'aria-label': host.closest('section').querySelector('h2').textContent }, host);
+    for (const t of ticks) {
+      el('line', { x1: m.l, x2: W - m.r, y1: y(t), y2: y(t), stroke: t === 0 ? css('--axis') : css('--grid') }, svg);
+      el('text', { x: m.l - 8, y: y(t) + 4, 'text-anchor': 'end', class: 'tick' }, svg).textContent = fmt(t);
+    }
+    labels.forEach((l, i) => { el('text', { x: x(i), y: H - 8, 'text-anchor': 'middle', class: 'tick' }, svg).textContent = l; });
+    const cross = el('line', { x1: 0, x2: 0, y1: m.t, y2: H - m.b, stroke: css('--axis'), opacity: 0 }, svg);
+    // Spread right-edge labels that would collide.
+    const ends = series.map(s => y(s.values[n - 1])).map((v, i) => ({ v, i })).sort((a, b) => a.v - b.v);
+    for (let k = 1; k < ends.length; k++) ends[k].v = Math.max(ends[k].v, ends[k - 1].v + 16);
+    const endY = []; ends.forEach(e => { endY[e.i] = e.v; });
+    series.forEach((s, k) => {
+      const c = css(s.color);
+      el('path', { d: s.values.map((v, i) => `${i ? 'L' : 'M'}${x(i)},${y(v)}`).join(''), fill: 'none', stroke: c, 'stroke-width': 2.5, 'stroke-linejoin': 'round', 'stroke-linecap': 'round' }, svg);
+      s.values.forEach((v, i) => el('circle', { cx: x(i), cy: y(v), r: 4, fill: c, stroke: '#fff', 'stroke-width': 2 }, svg));
+      el('text', { x: x(0), y: y(s.values[0]) - 10, 'text-anchor': 'middle', class: 'val' }, svg).textContent = fmt(s.values[0]);
+      el('text', { x: x(n - 1) + 10, y: endY[k] + 4, class: 'val' }, svg).textContent = `${fmt(s.values[n - 1])} ${s.name}`;
+    });
+    const ov = el('rect', { x: m.l, y: m.t, width: W - m.l - m.r, height: H - m.t - m.b, fill: 'transparent' }, svg);
+    ov.addEventListener('mousemove', e => {
+      const b = svg.getBoundingClientRect(), sx = (e.clientX - b.left) * W / b.width;
+      const i = Math.max(0, Math.min(n - 1, Math.floor((sx - m.l) / ((W - m.l - m.r) / n))));
+      cross.setAttribute('x1', x(i)); cross.setAttribute('x2', x(i)); cross.setAttribute('opacity', 1);
+      let h = `<b>${labels[i]}</b>${tipTitle ? ` · ${tipTitle}` : ''}`;
+      for (const s of series) h += `<div class="row">${sw(css(s.color))}${s.name}: <b>${fmt(s.values[i])}</b></div>`;
+      showTip(tip, card, h, e);
+    });
+    ov.addEventListener('mouseleave', () => { cross.setAttribute('opacity', 0); hideTip(tip); });
+  }
+
+  lineChart('chart1', {
+    labels: {{['Jan', 'Feb', …]}},
+    series: [
+      { name: '{{Series 1}}', color: '--s1', values: {{[…]}} },
+      { name: '{{Series 2}}', color: '--s2', values: {{[…]}} },
+    ],
+    yMax: {{0.6}}, ticks: {{[0, 0.2, 0.4, 0.6]}},
+    fmt: v => Math.round(v * 100) + '%',
+    tipTitle: '{{metric name}}',
+  });
+})();
+</script>
+</body>
+</html>
