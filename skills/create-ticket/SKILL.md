@@ -8,7 +8,7 @@ argument-hint: <issue-or-request-description>
 
 Create one Notion ticket in the Project Tasks database from the request in `$ARGUMENTS`.
 
-The goal is fast capture, not investigation. Preserve the user's context clearly enough that an engineer or PM can pick up the work later.
+The goal is capture, not investigation: grill the user for the details only they know, then preserve that context clearly enough that an engineer or PM can pick up the work later.
 
 ## Inputs
 
@@ -20,7 +20,7 @@ If `$ARGUMENTS` is empty, ask the user for the ticket description before continu
 
 - Do not inspect, search, or research the codebase to determine root cause, affected files, implementation details, or possible fixes.
 - Do not create a debugging plan unless the user explicitly provided one as context to include.
-- Do not invent missing facts. If a field is unclear and required to create a useful ticket, ask a concise clarifying question.
+- Do not invent missing facts. Every gap goes to the user in the grill (step 3).
 - Do not split the request into multiple tickets unless the user explicitly asks for multiple tickets.
 - Only select Notion tags from the `Allowed Tags` list in this file. Do not create, infer, normalize, or substitute tags outside that list, even if Notion or the request suggests a plausible tag.
 
@@ -44,31 +44,38 @@ If `$ARGUMENTS` is empty, ask the user for the ticket description before continu
 2. **Choose ticket properties.**
    - `Name`: concise action-oriented title in Title Case. Write it so a non-technical stakeholder (support, sales, ops) can understand what's wrong or wanted without knowing the codebase — name the user-facing symptom or outcome, not the internal mechanism.
    - `Status`: `Inbound`.
-   - `Team`: `Host`, `Renter`, `Enablement`, or `SEO`. Infer from the request when obvious. If it is not clear, ask the user for the team before creating the ticket.
+   - `Team`: `Items`, `Parking`, `Vehicle Storage`, `Enablement`, or `SEO`. Infer from the request when obvious; otherwise it goes in the grill.
    - `Is Bug`: `Bug` when the request describes broken, incorrect, regressed, or unexpected behavior. Otherwise `Not Bug`.
    - `Tags`: choose useful tags only from `Allowed Tags`, based on the supplied context. Include tags only when that domain is clearly present in the provided context. If none of the allowed tags clearly apply, leave `Tags` empty.
 
-3. **Draft the ticket body.**
+3. **Grill the user.**
+   - Use the ask-questions tool (`AskUserQuestion` in Claude Code) to put every gap to the user before drafting: unclear properties, missing expected vs. actual behavior, reproduction steps, scope, affected users or accounts, impact, and the acceptance criteria themselves. Also ask about anything ambiguous in the supplied context.
+   - Work in rounds: batch the questions you can ask now (up to 4 per call), make your recommended answer the first option, and let each answer shape the next round.
+   - Give every question except `Team` a `Punt` option for deciding later. A punted question becomes an `Open questions` bullet in the ticket.
+   - `Team` must be answered. Offer the four likeliest teams as options; the user picks any other team through the tool's free-text answer.
+   - The grill is done when every detail the ticket needs is answered from the context, by the user, or explicitly punted. Nothing left to a guess.
+
+4. **Draft the ticket body.**
    - Include a `## Description` and a `## Acceptance Criteria` section.
    - Summarize the problem or request in plain language so even a non-engineer could understand.
    - Include as much supplied context as possible without codebase research.
    - Include links under a clearly labeled line or list when links were provided.
    - For bugs, include provided expected behavior, actual behavior, reproduction steps, impact, and evidence when available.
    - For non-bugs, include the requested outcome, motivation, known constraints, and acceptance notes when available.
-   - If important details are missing, include a short `Open questions` subsection in the body rather than inventing answers.
+   - Include an `Open questions` subsection only for decisions the user chose to punt.
 
-4. **Create the Notion page.**
+5. **Create the Notion page.**
    - Use the Notion MCP's create-page/create-pages tool.
    - Parent: `{"data_source_id": "9bde6985-9747-4684-b969-c8ecec481b63"}`.
    - Properties:
      - `Name` — ticket title
      - `Status` — `Inbound`
-     - `Team` — `Host`, `Renter`, `Enablement`, or `SEO`
+     - `Team` — `Items`, `Parking`, `Vehicle Storage`, `Enablement`, or `SEO`
      - `Tags` — selected tags
      - `Is Bug` — `Bug` or `Not Bug`
    - Content: the drafted ticket body beginning with `## Description`.
 
-5. **Report back.**
+6. **Report back.**
    - Provide the created ticket title.
    - Provide the Notion URL.
    - Mention the selected `Team`, `Tags`, and `Is Bug` values.
@@ -103,7 +110,7 @@ Reproduction steps:
 
 Open questions:
 
-- [Only include material unknowns that remain after parsing the request]
+- [Only decisions the user chose to punt]
 
 ## Acceptance Criteria
 
