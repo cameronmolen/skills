@@ -86,7 +86,7 @@ When no blocking finding stands, go to step 5.
 Otherwise, post an auto review now, without asking the user. Notes wait for the brief, so leave them out of it.
 
 1. Re-read `headRefOid`. If the head moved since step 1, run steps 1 through 3 again on the new head.
-2. Draft each blocking finding's comment in the user's voice: a sentence or two naming the problem and its consequence, plus the fix. When the fix is a small, exact replacement of the commented lines, add a GitHub ` ```suggestion ` block. A finding still sitting in an open, unanswered thread from an earlier auto review gets no new comment; link it in the body instead.
+2. Write each blocking finding's comment with the `leaving-pr-comments` skill: a sentence or two naming the problem and its consequence, plus the fix. When the fix is a small, exact replacement of the commented lines, add a GitHub ` ```suggestion ` block. A finding still sitting in an open, unanswered thread from an earlier auto review gets no new comment; link it in the body instead.
 3. Post the review as step 8 shows, with `"event": "REQUEST_CHANGES"`. The body is one line per finding that has no inline comment, ending with `<!-- pr-brief:auto -->` on its own line.
 4. Remove the worktree as step 8 does, and start monitoring as step 9 describes.
 
@@ -202,13 +202,13 @@ Draft each note's comment as step 4 drafts one. Then, right after the brief, mak
 - **Notes**: multi-select questions, up to three notes each, in note order. Each option's label is `#<n> <short name>`, its description is the severity and consequence, and its `preview` is the exact comment body. End every notes question with a `No comments` option, described as posting none of that question's notes, so the user can leave the PR without review comments. With more than nine notes, list them numbered in text and ask the user to reply with the numbers to post, or `none`.
 - **Verdict**: Approve, Request changes, Comment only, or Hold (post nothing). Put your recommended verdict first, labeled `(Recommended)`. When you recommended reading the guide or the code, keep this order and label none.
 
-When the user annotates an option, treat the annotation as an edit to that comment. A comment the user writes out in full posts as written. With no notes, ask only the verdict question.
+When the user annotates an option, treat the annotation as an edit to that comment. A comment the user writes out in full posts as written, under the `leaving-pr-comments` callout. With no notes, ask only the verdict question.
 
 ## 8. Post the review
 
 Re-read `headRefOid` first. If the head moved while the user was deciding, say so, and re-brief the new commits instead of posting against stale lines.
 
-Post one review that carries the chosen comments and the verdict. Comments with no verdict post as a Comment review:
+Post one review that carries the chosen comments and the verdict. Comments with no verdict post as a Comment review. Write the review `body` with the `leaving-pr-comments` skill too:
 
 ```sh
 gh api repos/<owner>/<repo>/pulls/<n>/reviews --input - <<'EOF'
