@@ -7,9 +7,9 @@ description: When the user asks for an HTML writeup of work (NOT as part of the 
 
 ## When to Use
 
-Use this skill for any request to produce a readable HTML artifact for a human — whether it is called a plan, a spec, a write-up, findings, a summary, a report, a comparison, or a set of UI mocks. The word "plan" is often absent. What the requests share is: a document to read outside the terminal, and a link to open it.
+Use this skill for any request to produce a readable HTML artifact for a human — whether it is called a plan, a spec, a write-up, findings, a summary, a report, or a comparison. The word "plan" is often absent. What the requests share is: a document to read outside the terminal, and a link to open it.
 
-Do **not** use it for HTML that is part of the product being built (app templates, components, marketing pages). This skill is for documents about work, not shipped UI.
+Do **not** use it for HTML that is part of the product being built (app templates, components, marketing pages). This skill is for documents about work, not shipped UI. A prototype or mockup of a product UI change belongs to the `html-prototype` skill.
 
 ## Writing the HTML
 
