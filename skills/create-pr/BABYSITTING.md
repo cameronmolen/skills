@@ -70,7 +70,7 @@ Done when a re-fetch shows `Status` at `In verification`, or at the untouched va
 
 ## Review feedback
 
-Every piece of feedback from a reviewer, human or bot, ends up **answered**. That means a reply is posted on it, and if it's an inline thread, the thread is resolved. Replies post under the user's GitHub account, so write them the way the PR author would: a sentence or two with the substance the reviewer needs. Name a bot in backticks (`` `@claude` ``) or without the `@`: a bare `@claude` summons the review bot for another run.
+Every piece of feedback from a reviewer, human or bot, ends up **answered**. That means a reply is posted on it, and if it's an inline thread, the thread is resolved. Resolve human reviewers' threads too: the re-request below is what hands the PR back to them. Write each reply with the `leaving-pr-comments` skill, then post it with the commands below.
 
 For each item, pick the response:
 
@@ -79,7 +79,7 @@ For each item, pick the response:
 - **Already addressed, outdated, or mistaken**: the reply says so and why, citing the commit or code.
 - **Unsure**: ask the user with AskUserQuestion, and put your recommended responses first among the options. You're unsure when you don't know the answer, when the feedback can be read more than one way, when you'd push back on it, or when whether to implement it is a product or scope call. Batch the open items into one AskUserQuestion call. The user's answer becomes the reply, and a patch too when they choose one.
 
-Resolve each inline thread once your reply is posted. The one exception is a reply that asks the reviewer something back: that thread stays open, waiting on them. A new comment on a thread you already resolved is fresh feedback that needs answering. Top-level comments and review bodies can't be resolved. They count as answered once a later PR comment from the author responds to them.
+Resolve each inline thread in the same command that posts your reply (below). The one exception is a reply that asks the reviewer something back: that thread stays open, waiting on them. A new comment on a thread you already resolved is fresh feedback that needs answering. Top-level comments and review bodies can't be resolved. They count as answered once a later PR comment from the author responds to them.
 
 Unresolved inline threads, each with the `id` you reply to and resolve with:
 
@@ -95,18 +95,20 @@ gh api graphql -F owner=<owner> -F name=<repo> -F number=<PR> -f query='
   }' --jq '.data.repository.pullRequest.reviewThreads.nodes[] | select(.isResolved | not)'
 ```
 
-Reply to an inline thread, then resolve it:
+Reply to an inline thread and resolve it in one command. The resolve runs only once the reply has posted:
 
 ```sh
-gh api graphql -F id=<thread_id> -f body='<reply>' -f query='
+gh api graphql -F id=<thread_id> -F body=@<reply-file> -f query='
   mutation($id: ID!, $body: String!) {
     addPullRequestReviewThreadReply(input: {pullRequestReviewThreadId: $id, body: $body}) { comment { url } }
-  }'
+  }' --jq .data.addPullRequestReviewThreadReply.comment.url &&
 gh api graphql -F id=<thread_id> -f query='
-  mutation($id: ID!) { resolveReviewThread(input: {threadId: $id}) { thread { isResolved } } }'
+  mutation($id: ID!) { resolveReviewThread(input: {threadId: $id}) { thread { isResolved } } }' --jq .data.resolveReviewThread.thread.isResolved
 ```
 
-Top-level feedback comes from `gh pr view <PR> --json reviews,comments`. Answer it with `gh pr comment <PR> --body '<reply>'`: @mention the author (a bot by name, as above) and quote the line you're answering. Run `gh pr comment` with no `--jq` or `--json`, which make it post nothing and still exit cleanly. The comment URL it prints is your confirmation that it posted.
+Feedback is all answered when the unresolved-threads query returns only threads where your reply asked the reviewer something.
+
+Top-level feedback comes from `gh pr view <PR> --json reviews,comments`. Answer it with `gh pr comment <PR> --body '<reply>'`: @mention the author and quote the line you're answering. Run `gh pr comment` with no `--jq` or `--json`, which make it post nothing and still exit cleanly. The comment URL it prints is your confirmation that it posted.
 
 Once every piece of a human reviewer's feedback is answered, **re-request** their review, which puts the PR back in their queue. This covers each human whose latest review in `reviews` is `CHANGES_REQUESTED` or `COMMENTED`. An `APPROVED` reviewer is done, and bots are left to their own triggers.
 

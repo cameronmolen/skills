@@ -30,5 +30,6 @@ Write the comment itself in a direct style:
 - Cite the relevant code, behavior, check, or reproduction.
 - Keep it concise and avoid filler, canned thanks, or status narration.
 - Distinguish verified facts from judgment.
+- Name a bot in backticks (`` `@claude` ``) or without the `@`. A bare `@claude` summons the review bot for another run.
 
-Preview the final Markdown before posting so quoting and blank lines render as shown. After posting, verify that GitHub returned the comment or review URL. Resolve a review thread only after its response was posted successfully.
+Preview the final Markdown before posting so quoting and blank lines render as shown. After posting, verify that GitHub returned the comment or review URL.
