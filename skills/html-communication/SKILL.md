@@ -1,6 +1,6 @@
 ---
 name: html-communication
-description: When the user asks for an HTML writeup of work (NOT as part of the codebase) — a plan, spec, write-up, findings, report, comparison, or diagram — use this skill to write it well.
+description: Write an HTML document about work, such as a plan, spec, report, or diagram. Use when the user asks for an HTML write-up that is not part of the codebase.
 ---
 
 # HTML Communication

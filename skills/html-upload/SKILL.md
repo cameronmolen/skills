@@ -1,6 +1,6 @@
 ---
 name: html-upload
-description: Upload a local HTML file to postplan.dev and return the shareable URL, publish a new revision of an existing draft in place, or fetch the HTML behind a postplan.dev URL a user supplies. Use when the user asks to share, upload, or revise an HTML file via Postplan, or gives a postplan.dev link to read.
+description: Upload HTML to postplan.dev, or read it back from a postplan.dev link. Use when the user asks to share, upload, or revise an HTML file, or gives a postplan.dev link.
 ---
 
 # HTML Upload

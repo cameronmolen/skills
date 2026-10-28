@@ -1,6 +1,6 @@
 ---
 name: orchestrate-project
-description: Drive a Notion project's tickets to merged as one stacked PR chain, unattended once the operator approves the plan. One worker thread per ticket, each branched off the one below it; the orchestrator launches, restacks as the bottom merges, and moves each ticket's Notion status through its lifecycle.
+description: Drive a Notion project's tickets to merged as one stacked PR chain.
 disable-model-invocation: true
 argument-hint: <notion-project-url> [bootstrap|tick|status|teardown]
 ---

@@ -1,6 +1,6 @@
 ---
 name: pr-brief
-description: Brief a pull request for its human reviewer. Audits it through eight lenses with subagents, requests changes on bugs, security problems, coding-standards breaks, and missing demos without asking, then briefs the cleared PR with decision visuals, risk, blast radius, and a recommended verdict, writes a review guide for high-risk PRs, posts the comments and verdict the user picks, and re-briefs once the author responds. Use when the user wants to understand or review someone else's PR.
+description: Brief a pull request for its human reviewer. Use when the user asks to review or understand someone else's PR.
 argument-hint: <PR URL or number>
 allowed-tools: Bash, Read, Glob, Grep, Agent, AskUserQuestion, mcp__notion__notion-fetch, mcp__claude_ai_Notion__notion-fetch, mcp__t3-code__orchestrator_capabilities, mcp__t3-code__delegate_task, mcp__t3-code__task_status, mcp__t3-code__write_pull_request_guides, mcp__t3-code__read_pull_request_guide, mcp__t3-code__link_pull_request, mcp__t3-code__watch_pull_request, mcp__t3-code__unwatch_pull_request
 ---

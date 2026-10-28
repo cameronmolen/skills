@@ -1,6 +1,6 @@
 ---
 name: watch-review-requests
-description: Watch GitHub for PRs requesting your review and launch a T3 Code thread that briefs each one with pr-brief.
+description: Watch GitHub for PRs requesting your review and brief each one in its own thread.
 disable-model-invocation: true
 argument-hint: "[extra search qualifiers, e.g. org:neiybor]"
 allowed-tools: Bash, Read, AskUserQuestion, mcp__t3-code__t3_project_list, mcp__t3-code__t3_thread_launch, mcp__t3-code__t3_thread_list
