@@ -1,6 +1,6 @@
 ---
 name: create-project-tasks
-description: Break down a Notion project into implementable tasks in the Project Tasks database. Grills the user on the design, then creates tasks with descriptions, acceptance criteria, Figma links, and code location suggestions.
+description: Break a Notion project into tasks in the Project Tasks database.
 disable-model-invocation: true
 argument-hint: <notion-project-url> [figma-url]
 ---

@@ -1,6 +1,6 @@
 ---
 name: create-pr
-description: Open a pull request for the current changes, then babysit it until it merges. Use when the user wants to open a PR, push changes for review, or babysit an existing PR.
+description: Open a pull request and babysit it until it merges. Use when the user asks to open a PR or babysit one.
 argument-hint: [ENG-xxx]
 allowed-tools: Agent, Bash, Read, Edit, MultiEdit, Glob, Grep, AskUserQuestion, ToolSearch, Skill, mcp__notion__notion-fetch, mcp__notion__notion-search, mcp__notion__notion-update-page, mcp__notion__notion-create-pages, mcp__claude_ai_Notion__notion-fetch, mcp__claude_ai_Notion__notion-search, mcp__claude_ai_Notion__notion-update-page, mcp__claude_ai_Notion__notion-create-pages, mcp__t3-code__link_pull_request, mcp__t3-code__t3_thread_update, mcp__t3-code__watch_pull_request, mcp__t3-code__unwatch_pull_request
 ---

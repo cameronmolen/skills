@@ -1,6 +1,6 @@
 ---
 name: html-prototype
-description: Prototype a UI change as one clickable HTML file that copies the real product page from its code, with the change highlighted and every state one click away. Use when the user asks for a prototype or mockup of a feature, form, or screen in the product.
+description: Prototype a UI change as one clickable HTML file. Use when the user asks for a prototype or mockup of a product screen.
 ---
 
 # HTML Prototype
