@@ -54,8 +54,3 @@ Some skills call others. Install the ones they need too:
   `orchestrate-project`, which launch threads.
 - `python3` for `watch-review-requests` and `html-communication`, and Node.js
   for `orchestrate-project` and `html-upload`.
-
-## Make them yours
-
-These are starting points. Edit them. The Notion skills point at a specific
-tasks database, so swap in your own before using them.
