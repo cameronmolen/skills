@@ -9,7 +9,7 @@ The "Unit Selection System" feature is complex — it involves filtering, card l
 **Properties:**
 - Name: "Copycat LDP: Unit Card Layout & Data Display"
 - Status: "Inbound"
-- Team: "Host"
+- Team: "Items"
 - Points/Effort/Complexity: "3"
 
 **Content:**
@@ -54,7 +54,7 @@ Refer to individual unit cards in the "Available units" section of the left colu
 **Properties:**
 - Name: "Copycat LDP: Size Filter Chips"
 - Status: "Inbound"
-- Team: "Host"
+- Team: "Items"
 - Points/Effort/Complexity: "2"
 
 **Content:**
@@ -90,7 +90,7 @@ Refer to the horizontal chip bar above the unit cards in the "Available units" s
 **Properties:**
 - Name: "Copycat LDP: Units Section Layout & Grouping"
 - Status: "Inbound"
-- Team: "Host"
+- Team: "Items"
 - Points/Effort/Complexity: "2"
 
 **Content:**
@@ -126,7 +126,7 @@ Refer to the "Available units" section header and the "Storage units" / "Vehicle
 **Properties:**
 - Name: "Copycat LDP: Inline Lead Form on Book Now"
 - Status: "Inbound"
-- Team: "Host"
+- Team: "Items"
 - Points/Effort/Complexity: "3"
 
 **Content:**
