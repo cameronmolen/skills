@@ -1,13 +1,13 @@
 ---
 name: html-communication
-description: Write an HTML document about work, such as a plan, spec, report, or diagram. Use when the user asks for an HTML write-up that is not part of the codebase.
+description: Write an HTML document about work, such as a report, dashboard, plan, spec, or diagram, and upload it for a link. Use when the user asks for HTML that is not part of the codebase, including the report at the end of a data analysis.
 ---
 
 # HTML Communication
 
 ## When to Use
 
-Use this skill for any request to produce a readable HTML artifact for a human — whether it is called a plan, a spec, a write-up, findings, a summary, a report, or a comparison. The word "plan" is often absent. What the requests share is: a document to read outside the terminal, and a link to open it.
+Use this skill for any request to produce a readable HTML artifact for a human — whether it is called a plan, a spec, a write-up, findings, a summary, a report, a dashboard, or a comparison. The word "plan" is often absent. What the requests share is: a document to read outside the terminal, and a link to open it.
 
 Do **not** use it for HTML that is part of the product being built (app templates, components, marketing pages). This skill is for documents about work, not shipped UI. A prototype or mockup of a product UI change belongs to the `html-prototype` skill.
 
