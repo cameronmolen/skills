@@ -40,15 +40,15 @@ Use `delegate_task` for child work the orchestrator owns, such as a graph-extrac
 
 ## Claim before launch
 
-A ticket about to get a worker is a ticket a human should stop picking up. Before the first launch in a tick, query the Sprints data source `86133bd6-b63a-4993-9bfc-90f56c5a31c5` for the sprint whose `Team` is `Host` and whose date window contains today:
+A ticket about to get a worker is a ticket a human should stop picking up. Before the first launch in a tick, query the Sprints data source `86133bd6-b63a-4993-9bfc-90f56c5a31c5` for the sprint whose `Team` is `Items` and whose date window contains today:
 
 ```bash
 ntn datasources query 86133bd6-b63a-4993-9bfc-90f56c5a31c5 \
-  --filter '{"and":[{"property":"Team","select":{"equals":"Host"}},{"property":"Start Date","date":{"on_or_before":"<today>"}},{"property":"End Date","date":{"on_or_after":"<today>"}}]}' \
+  --filter '{"and":[{"property":"Team","select":{"equals":"Items"}},{"property":"Start Date","date":{"on_or_before":"<today>"}},{"property":"End Date","date":{"on_or_after":"<today>"}}]}' \
   --json
 ```
 
-Use the `Team`, `Start Date`, and `End Date` properties as the authority. Sprint names are inconsistent. If the query does not resolve to one active Host sprint, launch nothing and report the lookup as blocked.
+Use the `Team`, `Start Date`, and `End Date` properties as the authority. Sprint names are inconsistent. If the query does not resolve to one active Items sprint, launch nothing and report the lookup as blocked.
 
 Immediately before each `t3_thread_launch`, use `notion-update-page` to set the ticket's `Status` to `In progress`, `Assignee` to `Cameron Molen`, and `Sprint` to that sprint. The `Sprint` relation value must be the sprint's full Notion page URL, not its UUID. Claim only the tickets you are launching this tick; the rest of the launchable list stays at `Ready`.
 
