@@ -27,7 +27,7 @@ npx skills add cameronmolen/skills --skill create-pr
 | `create-ticket` | "create a ticket" | Asks for the details only you know, then files one ticket in a Notion tasks database. |
 | `html-communication` | "write this up in HTML" | Writes a report, dashboard, plan, spec, or diagram as one HTML page, and uploads it for sharing. |
 | `html-prototype` | "prototype this" | Copies the real product page from its code into one clickable HTML file, highlights the change, and puts every state one click away. |
-| `html-upload` | "share this HTML" | Uploads an HTML file to postplan.dev for a shareable link, revises an existing draft, or reads one from a link. |
+| `html-upload` | "share this HTML" | Publishes an HTML file as a Claude artifact (or to postplan.dev when artifacts are unavailable), revises an existing link, or reads one back. |
 | `leaving-pr-comments` | (automatic) | Formats comments that an agent posts on your behalf. |
 | `orchestrate-project` | `/orchestrate-project` | Drives a Notion project's tickets to merged as one stacked PR chain, one worker thread per ticket, unattended once you approve the plan. |
 | `pr-brief` | "review this PR" | Audits someone else's PR with subagents, requests changes on clear problems, then briefs you on risk and blast radius with a recommended verdict and posts the review you pick. |
@@ -52,5 +52,7 @@ Some skills call others. Install the ones they need too:
   through the Figma MCP server when it is connected.
 - [T3 Code](https://t3.codes) for `watch-review-requests` and
   `orchestrate-project`, which launch threads.
+- Claude Code's Artifact tool for `html-upload` to publish Claude artifacts.
+  Without it, `html-upload` falls back to postplan.dev.
 - `python3` for `watch-review-requests` and `html-communication`, and Node.js
-  for `orchestrate-project` and `html-upload`.
+  for `orchestrate-project` and the postplan.dev fallback in `html-upload`.
