@@ -29,11 +29,11 @@ A merge or close ends the watch **without waking you**. The **merge waiter** cat
 for i in $(seq 23); do [ "$(gh pr view <PR-URL> --json state --jq .state)" = OPEN ] || break; sleep 300; done; gh pr view <PR-URL> --json state --jq .state
 ```
 
-The harness kills background commands at two hours, so the waiter gives up at 115 minutes and prints the state itself. `OPEN` means it timed out: relaunch it and end your turn. It dies with the session; running `/create-pr` again on the branch starts babysitting over from the top.
+The harness kills background commands at two hours, so the waiter gives up at 115 minutes and prints the state itself. `OPEN` means it timed out: relaunch it, every time, and end your turn. Nothing else moves the ticket on merge, so the waiter runs until it prints `MERGED` or `CLOSED`. It dies with the session; running `/create-pr` again on the branch starts babysitting over from the top.
 
 ### On each wake
 
-A watch wake is a message headed `Update on pull request #<n>`. Read the PR (`gh pr view <PR> --json headRefOid,state,comments,reviews`) first, then drop the **stale** items, the ones that need nothing from you:
+A watch wake is a message headed `Update on pull request #<n>`. Read the PR (`gh pr view <PR> --json headRefOid,state,comments,reviews`) first. A `state` of `MERGED` or `CLOSED` on any wake is handled as the merge waiter's output below. Otherwise drop the **stale** items, the ones that need nothing from you:
 
 - Checks on a `<sha>` other than the current `headRefOid`. The head's own checks wake you when they finish.
 - A comment already answered (see Review feedback), often by the active loop before a mid-turn wake was delivered.

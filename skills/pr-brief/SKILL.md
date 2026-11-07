@@ -2,7 +2,7 @@
 name: pr-brief
 description: Brief a pull request for its human reviewer. Use when the user asks to review or understand someone else's PR.
 argument-hint: <PR URL or number>
-allowed-tools: Bash, Read, Glob, Grep, Agent, AskUserQuestion, mcp__notion__notion-fetch, mcp__claude_ai_Notion__notion-fetch, mcp__t3-code__orchestrator_capabilities, mcp__t3-code__delegate_task, mcp__t3-code__task_status, mcp__t3-code__write_pull_request_guides, mcp__t3-code__read_pull_request_guide, mcp__t3-code__link_pull_request, mcp__t3-code__watch_pull_request, mcp__t3-code__unwatch_pull_request
+allowed-tools: Bash, Read, Glob, Grep, Agent, AskUserQuestion, mcp__notion__notion-fetch, mcp__claude_ai_Notion__notion-fetch, mcp__t3-code__orchestrator_capabilities, mcp__t3-code__delegate_task, mcp__t3-code__task_status, mcp__t3-code__task_cancel, mcp__t3-code__write_pull_request_guides, mcp__t3-code__read_pull_request_guide, mcp__t3-code__link_pull_request, mcp__t3-code__watch_pull_request, mcp__t3-code__unwatch_pull_request
 ---
 
 A **brief** lets the reviewer decide a PR's future without reading its code. It is built from two things:
@@ -73,7 +73,7 @@ Save the diff beside the worktree with `gh pr diff <PR> > "$TMPDIR/pr-brief/<rep
 - the existing review threads, so it skips findings already raised. You check the user's own earlier threads yourself, below.
 - the instruction to return findings in the format `LENSES.md` gives and to edit nothing
 
-Verify each finding the lenses return before you keep it: re-read the code in the worktree, and confirm the trigger, the consequence, and the severity against the bar. Merge duplicates that several lenses raise, and drop nitpicks and anything you can't confirm. A finding already raised in another reviewer's open thread stays as a note marked _already raised by @login_, and is left out of every review. When a lens agent fails, run that lens again once (a fresh `clientRequestId`, suffixed `-retry`), and if it fails a second time, run it yourself.
+Verify each finding the lenses return before you keep it: re-read the code in the worktree, and confirm the trigger, the consequence, and the severity against the bar. Merge duplicates that several lenses raise, and drop nitpicks and anything you can't confirm. A finding already raised in another reviewer's open thread stays as a note marked _already raised by @login_, and is left out of every review. When a lens agent fails, run that lens again once (a fresh `clientRequestId`, suffixed `-retry`), and if it fails a second time, run it yourself. A failure that reports a usage or credit limit (`Usage limit reached`, `out of credits`) fails every Sol lens the same way: skip the retry, `task_cancel` the Sol lenses still running, and run every lens not yet returned as `Agent` subagents on Sonnet in one message. A lens result that arrives after its replacement has run, or after the review is posted, ends your turn in one line.
 
 On a re-review, also check each blocking finding from the user's earlier auto reviews against the new head. A fixed one is gone. One the author left unfixed and unanswered still stands as blocking. One the author disputed in a reply, instead of fixing, is weighed on the argument: if it holds, drop the finding, and if it doesn't, keep it as a High note marked _disputed by @author_, so the user settles it.
 
@@ -200,7 +200,7 @@ A logic diff at the right grain:
 Draft each note's comment as step 4 drafts one. Then, right after the brief, make one AskUserQuestion call:
 
 - **Notes**: multi-select questions, up to three notes each, in note order. Each option's label is `#<n> <short name>`, its description is the severity and consequence, and its `preview` is the exact comment body. End every notes question with a `No comments` option, described as posting none of that question's notes, so the user can leave the PR without review comments. With more than nine notes, list them numbered in text and ask the user to reply with the numbers to post, or `none`.
-- **Verdict**: Approve, Request changes, Comment only, or Hold (post nothing). Put your recommended verdict first, labeled `(Recommended)`. When you recommended reading the guide or the code, keep this order and label none.
+- **Verdict**: Approve, Request changes, Comment only, or Hold (post nothing). Put your recommended verdict first, labeled `(Recommended)`. When you recommended reading the guide or the code, keep this order and label none. Each verdict option's `preview` is the exact review `body` it posts.
 
 When the user annotates an option, treat the annotation as an edit to that comment. A comment the user writes out in full posts as written, under the `leaving-pr-comments` callout. With no notes, ask only the verdict question.
 
@@ -208,7 +208,7 @@ When the user annotates an option, treat the annotation as an edit to that comme
 
 Re-read `headRefOid` first. If the head moved while the user was deciding, say so, and re-brief the new commits instead of posting against stale lines.
 
-Post one review that carries the chosen comments and the verdict. Comments with no verdict post as a Comment review. Write the review `body` with the `leaving-pr-comments` skill too:
+Post one review that carries the chosen comments and the verdict. Comments with no verdict post as a Comment review. The review `body` is the chosen verdict's preview, written with the `leaving-pr-comments` skill. It carries only what the user saw in a step-7 preview, so merge order, deploy steps, pointers to other threads, and notes the user left unchosen stay out of it:
 
 ```sh
 gh api repos/<owner>/<repo>/pulls/<n>/reviews --input - <<'EOF'

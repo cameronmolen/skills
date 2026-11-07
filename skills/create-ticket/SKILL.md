@@ -44,7 +44,7 @@ If `$ARGUMENTS` is empty, ask the user for the ticket description before continu
 2. **Choose ticket properties.**
    - `Name`: concise action-oriented title in Title Case. Write it so a non-technical stakeholder (support, sales, ops) can understand what's wrong or wanted without knowing the codebase — name the user-facing symptom or outcome, not the internal mechanism.
    - `Status`: `Inbound`.
-   - `Team`: `Items`, `Parking`, `Vehicle Storage`, `Enablement`, or `SEO`. Infer from the request when obvious; otherwise it goes in the grill.
+   - `Team`: `Items`, `Parking`, `Vehicle Storage`, `Enablement`, or `SEO`. Take the first source that names one: a Team the caller passed (such as `create-pr`), a ticket linked in the request or this thread, an earlier ticket created in this session, or the request itself when it points to one team. Step 6 reports it, so the user can change it. It goes in the grill only when no source names one.
    - `Is Bug`: `Bug` when the request describes broken, incorrect, regressed, or unexpected behavior. Otherwise `Not Bug`.
    - `Tags`: choose useful tags only from `Allowed Tags`, based on the supplied context. Include tags only when that domain is clearly present in the provided context. If none of the allowed tags clearly apply, leave `Tags` empty.
 
@@ -52,7 +52,7 @@ If `$ARGUMENTS` is empty, ask the user for the ticket description before continu
    - Use the ask-questions tool (`AskUserQuestion` in Claude Code) to put every gap to the user before drafting: unclear properties, missing expected vs. actual behavior, reproduction steps, scope, affected users or accounts, impact, and the acceptance criteria themselves. Also ask about anything ambiguous in the supplied context.
    - Work in rounds: batch the questions you can ask now (up to 4 per call), make your recommended answer the first option, and let each answer shape the next round.
    - Give every question except `Team` a `Punt` option for deciding later. A punted question becomes an `Open questions` bullet in the ticket.
-   - `Team` must be answered. Offer the four likeliest teams as options; the user picks any other team through the tool's free-text answer.
+   - A `Team` question must be answered. Offer the four likeliest teams as options; the user picks any other team through the tool's free-text answer.
    - The grill is done when every detail the ticket needs is answered from the context, by the user, or explicitly punted. Nothing left to a guess.
 
 4. **Draft the ticket body.**
