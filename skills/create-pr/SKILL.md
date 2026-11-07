@@ -9,13 +9,28 @@ Work the steps in order.
 
 Arguments: `$ARGUMENTS` — an `ENG-xxx` task ID when one is given.
 
-## 1. Determine the branch
+## 1. Determine the branch and base
 
 - Read the current branch with `git branch --show-current`.
 - On a feature branch (anything but `main`, `master`, `staging`), stay on it.
 - On `main`/`master`/`staging`, read the changes with `git diff --stat` and `git diff --cached --stat`, then create and check out a kebab-case branch named for them (e.g. `add-user-endpoint`, `fix-search-pagination`).
 
-Done when `git branch --show-current` reports a feature branch.
+Then pick the **base**, the branch the PR merges into. When the PR already exists, its `baseRefName` is the base. Otherwise take the first source that names one:
+
+1. A base the user, the task prompt, or this thread states.
+2. An open PR this branch is stacked on: after `git fetch origin`, list each open PR whose head commit this branch already contains:
+
+   ```sh
+   gh pr list --state open --json headRefName,headRefOid --jq '.[] | "\(.headRefOid) \(.headRefName)"' |
+     while read -r oid ref; do [ "$ref" != "<branch>" ] && git merge-base --is-ancestor "$oid" HEAD 2>/dev/null && echo "$ref"; done
+   ```
+
+3. A target the repo's `AGENTS.md`, `CLAUDE.md`, or `CONTRIBUTING.md` documents for feature PRs, such as `test` or `staging`.
+4. The default branch: `gh repo view --json defaultBranchRef --jq .defaultBranchRef.name`.
+
+Two candidates from the same source go to the user. Every later `<base>` in this skill is this one.
+
+Done when `git branch --show-current` reports a feature branch and you hold the base.
 
 ## 2. Check coding standards
 
@@ -24,7 +39,7 @@ Skip when `git ls-files '*CODING_STANDARDS.md'` comes back empty.
 Dispatch one subagent on a cheap model (Sonnet, Luna, etc.) to make a quick pass over the change and fix what breaks the standards. Hand it:
 
 - the path to the `CODING_STANDARDS.md` file;
-- the change: `git add -A`, then `git diff --cached $(git merge-base HEAD origin/<base>)`, with `<base>` the repo's default branch;
+- the change: `git add -A`, then `git diff --cached $(git merge-base HEAD origin/<base>)`;
 - the brief: every standard applied to the changed lines, each violation fixed in place, edits confined to code the diff touches; return each fix (file, standard, change) and each violation left unfixed with why.
 
 Read its report and its edits; revert any fix that changes behavior rather than conforming to a standard.
@@ -43,10 +58,11 @@ The remote branch can move without you: a teammate's push, or a restack force-pu
 
 ```sh
 echo "old=$(git rev-parse -q --verify origin/<branch>)"; git fetch origin   # keep the old SHA
-git rev-list --left-right --count origin/<branch>...HEAD   # remote-only, then local-only
+git rev-parse -q --verify origin/<branch> >/dev/null && git rev-list --left-right --count origin/<branch>...HEAD   # remote-only, then local-only
 ```
 
-- No `origin/<branch>` yet, or no remote-only commits: push.
+- No `origin/<branch>` yet (the second line prints nothing): this is the first push. Bring the branch onto the base first: when `git merge-base --is-ancestor origin/<base> HEAD` fails, `git rebase origin/<base>`, and a conflict goes to the user. Skip the rebase in an orchestrate-project stack, whose base is managed below. Then push.
+- No remote-only commits: push.
 - Remote-only commits: reconcile onto the remote first. When `git rev-list <old>..HEAD` is empty, every local commit is already pushed, so `git reset --hard origin/<branch>`. Otherwise `git rebase --onto origin/<branch> <old>` replays only the commits made here since the last sync. A conflict, or no old SHA, goes to the user.
 - In an orchestrate-project stack (`refs/stack-base/<branch>` exists), also check that the layer below still holds your fork point: `git merge-base --is-ancestor refs/stack-base/<branch> <base ref>`, where `<base ref>` is `origin/<base>`, or the local `<base>` before it has ever been pushed. A failure means the layer below was rewritten: push nothing, tell the user, and wait for the orchestrator's restack message, which carries the exact commands.
 
@@ -68,7 +84,7 @@ None of those: search the data source with the Notion search tool (`data_source_
 
 - One clear match: use it.
 - Several plausible matches: ask the user to pick one or create a new ticket.
-- No match: invoke the `create-ticket` skill, passing a plain-language description of the change (the user-facing problem or outcome, why it matters, and any links from this thread).
+- No match: invoke the `create-ticket` skill, passing a plain-language description of the change (the user-facing problem or outcome, why it matters, and any links from this thread), plus the `Team` of any ticket this thread, the stacked-on PR, or an earlier ticket in this session names.
 
 Fetch the ticket and hold its URL, page ID, `ENG-xxx` ID, and title. Step 6 uses the ID in the PR title and the URL in the description; step 7 and BABYSITTING.md's On merge write back to the page ID.
 
@@ -242,8 +258,10 @@ function expandSkill(command: string): string {
 ### Command
 
 ```
-gh pr create --title "<title>" --body "<description>" --attach <path> --attach <path>
+gh pr create --base <base> --title "<title>" --body "<description>" --attach <path> --attach <path>
 ```
+
+Always pass step 1's `--base`; without it gh targets the default branch.
 
 One `--attach` per demo file; drop the flag when there are none. gh uploads each file and rewrites the body reference with the matching path to point at the uploaded asset. When some uploads fail, gh still creates the PR, prints its URL, and exits non-zero: take the URL, report the files that failed, and carry on.
 
@@ -255,7 +273,7 @@ Link the PR to this thread with `link_pull_request` as soon as you hold its URL,
 t3_thread_update({action: "rename", title: "<PR title>"})
 ```
 
-Done when you hold a linked PR URL, the thread title matches the PR title, every placeholder comment in the body has resolved to real content or `N/A`, and every recorded demo file shows in the body as an uploaded asset.
+Done when you hold a linked PR URL, its `baseRefName` is step 1's base (name it when you report the PR), the thread title matches the PR title, every placeholder comment in the body has resolved to real content or `N/A`, and every recorded demo file shows in the body as an uploaded asset.
 
 ## 7. Append the PR to the Notion ticket
 
@@ -284,4 +302,5 @@ Done when the PR is closed, or merged and On merge is done.
 ## Guardrails
 
 - Commit and push through the hooks; `--no-verify` stays out of every command.
+- Commit messages, the PR body, and comments are the user's own: no `Co-Authored-By` or `Generated with` trailer naming an AI.
 - A failing step stops the run and reports the error rather than retrying blindly. Step 7 is the exception: report and carry on to step 8.
