@@ -1,11 +1,29 @@
 ---
 name: html-upload
-description: Upload HTML to postplan.dev, or read it back from a postplan.dev link. Use when the user asks to share, upload, or revise an HTML file, or gives a postplan.dev link.
+description: Publish an HTML file for a shareable link, as a Claude artifact or on postplan.dev, or read one back from its link. Use when the user asks to share, upload, or revise an HTML file, or gives a postplan.dev or claude.ai artifact link.
 ---
 
 # HTML Upload
 
-## Upload
+## Pick the host
+
+A revision stays on the host of the link the user already holds. A new upload goes to a **Claude artifact** when you have a tool that publishes them (Claude Code's `Artifact` tool), and to **Postplan** otherwise.
+
+## Claude artifact
+
+Publish the finished file as a page: `Artifact` with `file_path` and a one-word `icon`, then give the user the link. The HTML is already the deliverable, so publish it directly; skip the quickstart and the Artifact types, which would rebuild it as a Doc or Dashboard.
+
+Load `artifact-design` as the tool requires. Its page contract applies in full: a two-to-four-word `<title>`, and every asset inline (scripts only from its allowed CDNs, stylesheets only from Google Fonts). On design, the writing skill's look wins, including a light-only page; `artifact-design` fills only what that skill leaves open.
+
+Artifacts start private. Tell the user the link is private until they share it from claude.ai.
+
+**Revise** by publishing to the same artifact: the same `file_path` within this session, or `url` from another one, after an `action: "read"` of it.
+
+**Read** a `claude.ai/artifact/…` or `claude.ai/code/artifact/…` link with `Artifact` `action: "read"`, then continue the requested task.
+
+## Postplan
+
+### Upload
 
 ```bash
 npx postplan upload <plan.html>                # new draft
@@ -20,7 +38,7 @@ Postplan rejects files that contain a `<form>` tag. Group inputs in a `div` and 
 
 **The draft id is the link's subdomain**, so whatever the user pasted is enough to target it — `https://qi37drbp71nr.postplan.dev` or `https://postplan.dev/d/qi37drbp71nr/raw` both give `--draft qi37drbp71nr`.
 
-## Read a Postplan URL
+### Read a Postplan URL
 
 When a user supplies a `postplan.dev` URL, fetch the uploaded HTML immediately with the shell. Do not use web search or a browser to retrieve it.
 

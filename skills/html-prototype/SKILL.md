@@ -24,7 +24,7 @@ Done when every color, font, radius, and spacing value you will write traces to 
 
 ## 3. Build
 
-One `.html` file with inline CSS and JS. Link the product's own font files from its CDN, the same URLs the app uses; images and icons go inline as SVG or data URLs.
+One `.html` file with inline CSS and JS. Inline the product's own font files as `data:` URLs, fetched from the same CDN URLs the app uses, and images and icons as SVG or data URLs; a Claude artifact blocks other origins.
 
 Page structure, top to bottom:
 
@@ -56,4 +56,4 @@ Done when you have viewed every state × size and each one shows the change alig
 
 ## 5. Share
 
-Upload with the `html-upload` skill. Reply with the link, the states and their hash links, which host page variant you used, the copy that needs review, and the local file path. Publish revisions to the same draft.
+Upload with the `html-upload` skill. Reply with the link, the states and their hash links, which host page variant you used, the copy that needs review, and the local file path. Publish revisions to the same link.
