@@ -267,13 +267,13 @@ One `--attach` per demo file; drop the flag when there are none. gh uploads each
 
 When the PR already exists, `gh pr view --json url,state,number,headRefName,baseRefName` names the target instead; attach demo files recorded since with `gh pr edit <PR> --attach <path>`, which appends them to the existing body.
 
-Link the PR to this thread with `link_pull_request` as soon as you hold its URL, so T3 Code shows its status beside the thread. Then rename this thread to the PR's exact title, so the thread list reads the same as the PR list:
+Link the PR to this thread with `link_pull_request` as soon as you hold its URL, so T3 Code shows its status beside the thread. Then, unless this thread's title already contains the ticket's `ENG-xxx` ID, rename the thread to the PR's exact title, so the thread list reads the same as the PR list:
 
 ```
 t3_thread_update({action: "rename", title: "<PR title>"})
 ```
 
-Done when you hold a linked PR URL, its `baseRefName` is step 1's base (name it when you report the PR), the thread title matches the PR title, every placeholder comment in the body has resolved to real content or `N/A`, and every recorded demo file shows in the body as an uploaded asset.
+Done when you hold a linked PR URL, its `baseRefName` is step 1's base (name it when you report the PR), the thread title contains the ticket's `ENG-xxx` ID or matches the PR title, every placeholder comment in the body has resolved to real content or `N/A`, and every recorded demo file shows in the body as an uploaded asset.
 
 ## 7. Append the PR to the Notion ticket
 
