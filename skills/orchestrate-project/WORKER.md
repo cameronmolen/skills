@@ -71,7 +71,7 @@ t3_thread_launch({
 
 The moment `t3_thread_launch` returns, run `scripts/stack.mjs <PLN> push <ENG-####> --thread <thread-id>`. That appends the ticket to the stack, freezes its base, and sets `status` to `running`. **Until you run it the stack tip is stale, and the next launch will branch off the wrong ticket.**
 
-Fill `<below you>` with `<parent>, owned by worker thread <parent_thread_id>` when there is a parent, and with `the project's base` at the floor.
+Fill `<below you>` with `<parent>, owned by worker thread <parent_thread_id>` when there is a parent, and with `the project's base` at the floor. Fill `<orchestrator thread id>` with this thread's own id, the `currentThreadId` that any `t3_thread_list` call returns. A worker sees only its prompt's text, not which thread launched it.
 
 ```
 You own <ENG-####>: <ticket name>
@@ -84,8 +84,9 @@ This branch is one layer of a stacked PR chain on <repo>, merged bottom-up into
 <floor>. <base_branch> is the layer below you (<below you>). It already
 contains the work you depend on. Treat it as read-only.
 
-The operator talks to you directly in this thread. An orchestrator thread runs
-the stack and Notion; its only messages to you are restacks.
+The operator talks to you directly in this thread. An orchestrator thread
+(<orchestrator thread id>) runs the stack and Notion; its messages to you are
+restacks and answers to your questions.
 
 ## Implement
 
@@ -128,8 +129,21 @@ the stack and Notion; its only messages to you are restacks.
 - Report to the operator what you changed, which checks you ran (including
   the Sol review and /verify or the browser verification), any Sol finding
   you dismissed, and any remaining concern. Then end your turn and wait for
-  the operator. Ask them instead of guessing when the ticket's approach is
-  genuinely ambiguous.
+  the operator.
+
+## Questions
+
+When the ticket's approach is genuinely ambiguous, or you need a fact you
+can't find yourself, ask the orchestrator before the operator:
+  t3_thread_send({threadId: "<orchestrator thread id>", mode: "queue",
+    message: "QUESTION <ENG-####>: <the question, and what you already checked>"})
+Then end your turn. The reply arrives in this thread and opens with one of:
+  ANSWER: <answer and its source>     carry on with it
+  ASK_OPERATOR: <why, and any context>  a human decision: ask the operator the
+                                        question yourself, here, with that
+                                        context, then end your turn and wait
+Whatever the operator has already said in this thread settles a question;
+ask the orchestrator only what it leaves open.
 
 ## Open the PR, when the operator asks
 
@@ -208,6 +222,21 @@ On `RESTACKED`, run `stack.mjs <PLN> restacked <ENG-####>` and send the next. On
 ## Restack on rewrite
 
 A layer rewritten in place, by an operator-asked rebase or a conflict fix, strands every layer above it the same way a merge does. `poll-prs.mjs` catches it: a child's `refs/stack-base/<child>` drops out of its parent's history. It queues the parent on `pending_restack` and wakes you with `layer_rewritten`, and the tick restacks the column above it exactly as for a merge, with `cause: rewritten` and no retarget.
+
+## Answering worker questions
+
+A worker's question arrives in this thread as a message opening `QUESTION <ENG-####>:`. Answer it and end the turn. It is not a tick, so leave the waiter alone.
+
+Answer only what the evidence **settles**: the ticket and its siblings in Notion, the project page, the operator's words and gate decisions earlier in this thread, the ledger and `dag.json`, and a sibling layer's code read from its `worktree_path` with file reads, never git. Name the source in the answer.
+
+Everything the evidence leaves open is the operator's call: a product or scope choice, a trade-off, an acceptance criterion the ticket leaves loose, or a change that reaches another ticket. Reply `ASK_OPERATOR` with why it needs a human and whatever context you found, so the worker can put the question to the operator in its own thread, beside the code it concerns. Leave the asking to the worker.
+
+Send the reply to the ticket's `thread_id` from the ledger, with `mode: "queue"` so it lands as the worker's next turn:
+
+```
+ANSWER: <answer>. Source: <where it is settled>
+ASK_OPERATOR: <why this is a human decision>. Context: <what you found>
+```
 
 ## Reading workers cheaply
 
