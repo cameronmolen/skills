@@ -13,13 +13,13 @@ Run a Notion project's ticket graph to completion as a single stacked PR chain. 
 
 ## Who does what
 
-|                  | Owns                                                                     | Leaves to others                                   |
-| ---------------- | ------------------------------------------------------------------------ | -------------------------------------------------- |
-| **Orchestrator** | The queue: launches, restacks, Notion `Status`, the ledger               | Code, PRs, and every conversation after bootstrap  |
-| **Worker**       | One ticket's branch, its PR, and that PR's babysitting                   | Merging, and every other branch                    |
-| **Operator**     | Scope and gates at bootstrap; then each worker directly; every merge     |                                                    |
+|                  | Owns                                                                                      | Leaves to others                                           |
+| ---------------- | ----------------------------------------------------------------------------------------- | ---------------------------------------------------------- |
+| **Orchestrator** | The queue: launches, restacks, Notion `Status`, the ledger; answers to workers' questions | Code, PRs, and every operator conversation after bootstrap |
+| **Worker**       | One ticket's branch, its PR, and that PR's babysitting                                    | Merging, and every other branch                            |
+| **Operator**     | Scope and gates at bootstrap; then each worker directly; every merge                      |                                                            |
 
-Bootstrap is where you get in step with the operator. After it you run **unattended**: wake on GitHub, act, re-arm, sleep. The operator talks to each worker in its own thread — "create a PR", review feedback, a rename — and never needs to answer you. Each tick ends with a short report in this thread, a log the operator reads when they choose. Something only a human can resolve, such as a restack conflict, already surfaces in that worker's thread; name it in the report and carry on with everything else.
+Bootstrap is where you get in step with the operator. After it you run **unattended**: wake on GitHub, act, re-arm, sleep. The operator talks to each worker in its own thread — "create a PR", review feedback, a rename — and never needs to answer you. A worker with a question asks you first; you answer what the project's record settles and send the rest back for the worker to ask the operator. Each tick ends with a short report in this thread, a log the operator reads when they choose. Something only a human can resolve, such as a restack conflict, already surfaces in that worker's thread; name it in the report and carry on with everything else.
 
 Merging is human-gated at Neighbor. PRs squash into `staging` on a person's click, so throughput is not yours to raise. Your job is queue management: keep the frontier launched, keep the ledger true, keep Notion honest.
 
@@ -101,6 +101,8 @@ Route on the phase argument.
 - **`tick`** reconciles, restacks, writes Notion, launches, and re-arms. You run it yourself on every wake; the operator runs it only to restart a run that died. Read [`WORKER.md`](WORKER.md).
 - **`status`** prints a read-only summary.
 - **`teardown`** reaps worktrees, compose stacks, the waiter, and the heartbeat.
+
+A message opening `QUESTION <ENG-####>:` is a worker asking, not a phase. Answer it per [`WORKER.md`](WORKER.md#answering-worker-questions).
 
 ---
 
