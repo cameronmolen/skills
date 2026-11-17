@@ -44,7 +44,7 @@ If `$ARGUMENTS` is empty, ask the user for the ticket description before continu
 2. **Choose ticket properties.**
    - `Name`: concise action-oriented title in Title Case. Write it so a non-technical stakeholder (support, sales, ops) can understand what's wrong or wanted without knowing the codebase — name the user-facing symptom or outcome, not the internal mechanism.
    - `Status`: `Inbound`.
-   - `Team`: `Items`, `Parking`, `Vehicle Storage`, `Enablement`, or `SEO`. Take the first source that names one: a Team the caller passed (such as `create-pr`), a ticket linked in the request or this thread, an earlier ticket created in this session, or the request itself when it points to one team. Step 6 reports it, so the user can change it. It goes in the grill only when no source names one.
+   - `Team`: `Item`, `Parking`, `Vehicle Storage`, `Enablement`, or `SEO`. Take the first source that names one: a Team the caller passed (such as `create-pr`), a ticket linked in the request or this thread, an earlier ticket created in this session, or the request itself when it points to one team. Step 6 reports it, so the user can change it. It goes in the grill only when no source names one.
    - `Is Bug`: `Bug` when the request describes broken, incorrect, regressed, or unexpected behavior. Otherwise `Not Bug`.
    - `Tags`: choose useful tags only from `Allowed Tags`, based on the supplied context. Include tags only when that domain is clearly present in the provided context. If none of the allowed tags clearly apply, leave `Tags` empty.
 
@@ -70,7 +70,7 @@ If `$ARGUMENTS` is empty, ask the user for the ticket description before continu
    - Properties:
      - `Name` — ticket title
      - `Status` — `Inbound`
-     - `Team` — `Items`, `Parking`, `Vehicle Storage`, `Enablement`, or `SEO`
+     - `Team` — `Item`, `Parking`, `Vehicle Storage`, `Enablement`, or `SEO`
      - `Tags` — selected tags
      - `Is Bug` — `Bug` or `Not Bug`
    - Content: the drafted ticket body beginning with `## Description`.

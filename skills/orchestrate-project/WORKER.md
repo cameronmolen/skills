@@ -40,15 +40,15 @@ Use `delegate_task` for child work the orchestrator owns, such as a graph-extrac
 
 ## Claim before launch
 
-A ticket about to get a worker is a ticket a human should stop picking up. Before the first launch in a tick, query the Sprints data source `86133bd6-b63a-4993-9bfc-90f56c5a31c5` for the sprint whose `Team` is `Items` and whose date window contains today:
+A ticket about to get a worker is a ticket a human should stop picking up. Before the first launch in a tick, query the Sprints data source `86133bd6-b63a-4993-9bfc-90f56c5a31c5` for the sprint whose `Team` is `Item` and whose date window contains today:
 
 ```bash
 ntn datasources query 86133bd6-b63a-4993-9bfc-90f56c5a31c5 \
-  --filter '{"and":[{"property":"Team","select":{"equals":"Items"}},{"property":"Start Date","date":{"on_or_before":"<today>"}},{"property":"End Date","date":{"on_or_after":"<today>"}}]}' \
+  --filter '{"and":[{"property":"Team","select":{"equals":"Item"}},{"property":"Start Date","date":{"on_or_before":"<today>"}},{"property":"End Date","date":{"on_or_after":"<today>"}}]}' \
   --json
 ```
 
-Use the `Team`, `Start Date`, and `End Date` properties as the authority. Sprint names are inconsistent. If the query does not resolve to one active Items sprint, launch nothing and report the lookup as blocked.
+Use the `Team`, `Start Date`, and `End Date` properties as the authority. Sprint names are inconsistent. If the query does not resolve to one active Item sprint, launch nothing and report the lookup as blocked.
 
 Immediately before each `t3_thread_launch`, use `notion-update-page` to set the ticket's `Status` to `In progress`, `Assignee` to `Cameron Molen`, and `Sprint` to that sprint. The `Sprint` relation value must be the sprint's full Notion page URL, not its UUID. Claim only the tickets you are launching this tick; the rest of the launchable list stays at `Ready`.
 
@@ -99,7 +99,10 @@ restacks and answers to your questions.
 - Lint changed files, then run the tests.
 - Ask GPT 6.1 Sol to review your change. Look up its provider instance and
   model id with T3's orchestrator_capabilities, then call delegate_task with
-  that target. Hand it the ticket's acceptance criteria and the change:
+  that target. When Sol is missing from the catalog, or its run fails on a
+  usage or credit limit, run the same review as an Agent subagent on Sonnet
+  (model: "sonnet") instead. Hand the reviewer the ticket's acceptance
+  criteria and the change:
   git add -A, then git diff --cached refs/stack-base/<branch>. Tell it to:
   - review with mistrust: assume the change is wrong until the code proves
     otherwise, and check every claim in the diff or ticket against the repo;
@@ -114,7 +117,6 @@ restacks and answers to your questions.
   - report findings (file, line, problem, why it matters) and edit nothing.
   Check each finding against the code, fix the ones that hold, and rerun
   lint and tests. Note any finding you dismiss, and why, for your report.
-  If Sol is not in the catalog, skip the review and say so in your report.
 - If this project has a /verify skill, you are not done until it passes: run
   it on your change, fix what it finds, and run it again. Keep any
   screenshots or recordings it saves; create-pr uses those as the PR's demo.
@@ -127,9 +129,9 @@ restacks and answers to your questions.
   browser, report the work as unverified, say what stopped you, and leave
   the call to the operator.
 - Report to the operator what you changed, which checks you ran (including
-  the Sol review and /verify or the browser verification), any Sol finding
-  you dismissed, and any remaining concern. Then end your turn and wait for
-  the operator.
+  the review, which model ran it, and /verify or the browser verification),
+  any review finding you dismissed, and any remaining concern. Then end
+  your turn and wait for the operator.
 
 ## Questions
 
