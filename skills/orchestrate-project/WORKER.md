@@ -97,12 +97,12 @@ restacks and answers to your questions.
 - Read the Notion ticket in full, including its acceptance criteria.
 - Implement it. Follow the repo's CLAUDE.md.
 - Lint changed files, then run the tests.
-- Ask GPT 6.1 Sol to review your change. Look up its provider instance and
-  model id with T3's orchestrator_capabilities, then call delegate_task with
-  that target. When Sol is missing from the catalog, or its run fails on a
-  usage or credit limit, run the same review as an Agent subagent on Sonnet
-  (model: "sonnet") instead. Hand the reviewer the ticket's acceptance
-  criteria and the change:
+- Ask the newest GPT Sol model to review your change. Look up its provider
+  instance and model id with T3's orchestrator_capabilities, then call
+  delegate_task with that target. When Sol is missing from the catalog, or
+  its run fails on a usage or credit limit, run the same review as an Agent
+  subagent on Sonnet (model: "sonnet") instead. Hand the reviewer the
+  ticket's acceptance criteria and the change:
   git add -A, then git diff --cached refs/stack-base/<branch>. Tell it to:
   - review with mistrust: assume the change is wrong until the code proves
     otherwise, and check every claim in the diff or ticket against the repo;
