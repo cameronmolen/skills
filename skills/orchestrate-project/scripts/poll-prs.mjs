@@ -13,8 +13,8 @@
  * the worker that owns the PR, so they are logged and never wake the orchestrator.
  *
  * `--wait` is the orchestrator's wake signal. It runs as a background task whose
- * exit re-invokes the orchestrator, and it stamps waiter.json on every pass so a
- * heartbeat can tell a live waiter from a dead one. Never touches Notion.
+ * exit re-invokes the orchestrator. Each pass stamps waiter.json so the
+ * orchestrator can check whether a waiter is already live. Never touches Notion.
  */
 import { execFileSync } from "node:child_process"
 import { appendFileSync } from "node:fs"

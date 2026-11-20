@@ -70,4 +70,4 @@ fi
 echo
 echo "Networks now in use: $(docker network ls -q 2>/dev/null | wc -l | tr -d ' ') (pool is ~30)"
 [ "$FORCE" = "--force" ] || echo "DRY RUN. Nothing changed. Re-run with --force."
-echo "Still to do by hand: delete the scheduled task (list_scheduled_tasks -> delete_scheduled_task) and close the worker threads."
+echo "Close any remaining worker threads by hand."

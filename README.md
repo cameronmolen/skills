@@ -29,7 +29,7 @@ npx skills add cameronmolen/skills --skill create-pr
 | `html-prototype` | "prototype this" | Copies the real product page from its code into one clickable HTML file, highlights the change, and puts every state one click away. |
 | `html-upload` | "share this HTML" | Publishes an HTML file as a Claude artifact (or to postplan.dev when artifacts are unavailable), revises an existing link, or reads one back. |
 | `leaving-pr-comments` | (automatic) | Formats comments that an agent posts on your behalf. |
-| `orchestrate-project` | `/orchestrate-project` | Drives a Notion project's tickets to merged as one stacked PR chain, one worker thread per ticket, unattended once you approve the plan. |
+| `orchestrate-project` | `/orchestrate-project` | Runs a Notion project as one stacked PR chain, with one worker thread per ticket and GitHub updates polled through `gh` after you approve the plan. |
 | `pr-brief` | "review this PR" | Audits someone else's PR with subagents, requests changes on clear problems, then briefs you on risk and blast radius with a recommended verdict and posts the review you pick. |
 | `retro` | `/retro` | Reads this repo's past agent sessions for friction, and suggests fixes to docs, checks, and tooling. |
 | `watch-review-requests` | `/watch-review-requests` | Watches GitHub for PRs that request your review, and launches a T3 Code thread that briefs each one. |
