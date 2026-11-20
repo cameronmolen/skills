@@ -100,7 +100,7 @@ Route on the phase argument.
 - **`bootstrap`** gets in step with the operator, builds the frozen DAG and ledger from Notion, and starts the run. Read [`NOTION-GRAPH.md`](NOTION-GRAPH.md).
 - **`tick`** reconciles, restacks, writes Notion, launches, and re-arms. You run it yourself on every wake; the operator runs it only to restart a run that died. Read [`WORKER.md`](WORKER.md).
 - **`status`** prints a read-only summary.
-- **`teardown`** reaps worktrees, compose stacks, the waiter, and the heartbeat.
+- **`teardown`** reaps worktrees, compose stacks, and the waiter.
 
 A message opening `QUESTION <ENG-####>:` is a worker asking, not a phase. Answer it per [`WORKER.md`](WORKER.md#answering-worker-questions).
 
@@ -124,15 +124,15 @@ A message opening `QUESTION <ENG-####>:` is a worker asking, not a phase. Answer
 
 5. Present the operator with `project.chain` as the proposed stack order, the frontier, every Mermaid divergence, the concurrency cap, and each gated ticket with its evidence. **Ask for each gate's decision now.** This is the last conversation of the run; a gate left open stays unlaunched, along with everything that depends on it, until the operator comes back to this thread to settle it. **Wait for explicit approval of the stack order before launching anything.** The order is frozen once the first worker launches, so this is the one cheap moment to change it.
 
-6. Start the run. Schedule the heartbeat from [`POLLING.md`](POLLING.md), then run the tick, which launches the first workers and starts the waiter. Close by telling the operator the run is live and that from here they talk to the workers, each in its own thread.
+6. Run the first tick to launch the first workers and start the waiter. Close by telling the operator the run is live and that from here they talk to the workers, each in its own thread.
 
-Done when the operator has approved, `ledger.json` assigns every ticket a `status`, the first workers are launched, the waiter is running, and the heartbeat is scheduled.
+Done when the operator has approved, `ledger.json` assigns every ticket a `status`, and the first tick is complete.
 
 ---
 
 ## Phase: tick
 
-A tick starts on a wake — the waiter exiting, the heartbeat finding the waiter dead, or the operator restarting the run. Run all five steps in order, every tick. Read [`WORKER.md`](WORKER.md) for the launch contract and the restack move.
+Run a tick at bootstrap, when the waiter exits, or when the operator restarts the run. Run all five steps in order, every tick. Read [`WORKER.md`](WORKER.md) for the launch contract and the restack move.
 
 1. **Reconcile.** Run `scripts/poll-prs.mjs <PLN>` for one pass. It updates PR state in the ledger, marks merges, and queues on `pending_restack` each merge, and each layer rewritten in place (`layer_rewritten`), that has live tickets above it.
 
@@ -148,9 +148,9 @@ A tick starts on a wake — the waiter exiting, the heartbeat finding the waiter
 
 5. **Re-arm and report.** Start the waiter per [`POLLING.md`](POLLING.md), unless one is already live. Then report in a few lines: the stack from `frontier.mjs <PLN> --table`, bottom-to-top, marking the entry mergeable now; what this tick changed; and anything stuck — a stalled bottom, a blocked restack, a failed Notion write, a gate. End the turn.
 
-   When nothing is running, open, launchable, or restacking, the run is over: skip the waiter, delete the heartbeat, report what is merged and any gated tickets left, and suggest `teardown`.
+   When nothing is running, open, launchable, or restacking, finish the run by reporting what is merged and any gated tickets left, and suggest `teardown`. Skip the waiter.
 
-Done when the ledger is written, `pending_restack` is empty, `restack_queue` is empty or stopped on a named `RESTACK_BLOCKED`, `notion_writes` is empty or each failure is reported, `launch_now` is launched up to capacity, and a waiter is live.
+Done when the ledger is written, `pending_restack` is empty, `restack_queue` is empty or stopped on a named `RESTACK_BLOCKED`, `notion_writes` is empty or each failure is reported, `launch_now` is launched up to capacity, and a waiter is live if the run is still active.
 
 ---
 
@@ -168,7 +168,7 @@ Reap only when the stack is empty. A live entry's worktree is skipped, but its `
 
 **Teardown is not optional.** Deleting a worktree does not stop its compose stack, and abandoned stacks exhaust Docker's bridge-network pool of roughly 30 until every `make run-test` on the machine dies with `all predefined address pools have been fully subnetted`.
 
-Then delete the heartbeat via `list_scheduled_tasks` and `delete_scheduled_task`, and report which threads are still alive so the operator can close them.
+Report which threads are still alive so the operator can close them.
 
 ---
 
@@ -185,4 +185,4 @@ Then delete the heartbeat via `list_scheduled_tasks` and `delete_scheduled_task`
 
 ## Waking
 
-You wake yourself: a background waiter wakes you when GitHub changes, and a heartbeat restarts the waiter when the session dies. Read [`POLLING.md`](POLLING.md) to arm either.
+The background waiter polls GitHub through `gh` and wakes you when an actionable change occurs. Read [`POLLING.md`](POLLING.md) to start it.
