@@ -25,6 +25,7 @@ npx skills add cameronmolen/skills --skill create-pr
 | `create-pr` | "open a PR" | Opens a PR for the current changes, links its Notion ticket, and babysits it through CI and review until it merges. |
 | `create-project-tasks` | `/create-project-tasks` | Grills you on a Notion project's design, then creates its tasks with acceptance criteria, Figma links, code locations, and a dependency graph. |
 | `create-ticket` | "create a ticket" | Asks for the details only you know, then files one ticket in a Notion tasks database. |
+| `drive-browser` | `/drive-browser` | Loads the agent guide that ships with your `ardia` CLI, then does the task in your own Ardia browser with your tabs and logins. |
 | `html-communication` | "write this up in HTML" | Writes a report, dashboard, plan, spec, or diagram as one HTML page, and uploads it for sharing. |
 | `html-prototype` | "prototype this" | Copies the real product page from its code into one clickable HTML file, highlights the change, and puts every state one click away. |
 | `html-upload` | "share this HTML" | Publishes an HTML file as a Claude artifact (or to postplan.dev when artifacts are unavailable), revises an existing link, or reads one back. |
